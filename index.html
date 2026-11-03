@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>四叶草</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- 引入旧版的本地存储库 localforage (用于存数据) -->
+  <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
+</head>
+<body>
+
+  <div class="phone-container">
+
+    <!-- 1. 顶部导航栏 -->
+    <div class="top-bar">
+      <div class="nav-left">
+        <!-- 点击进入梦角聊天 / 下拉选择 -->
+        <div class="avatar-item" id="dreamAvatarBtn">
+          <div class="avatar-circle" id="topDreamAvatar">梦</div>
+          <div class="avatar-name" id="topDreamName">名字</div>
+        </div>
+        <div class="heart-icon">♥</div>
+        <!-- 点击进入用户个人信息 -->
+        <div class="avatar-item" onclick="navigateTo('pageUserProfile')">
+          <div class="avatar-circle" id="topUserAvatar" style="background:#ffe0e8; color:#d6336c;">用</div>
+          <div class="avatar-name" id="topUserName">名字</div>
+        </div>
+      </div>
+
+            <div class="nav-center">
+        <div class="nav-icon" onclick="navigateTo('pageContacts')"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></div>
+        
+        <div class="nav-icon" onclick="navigateTo('pageWordCards')"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"></rect><line x1="3" y1="10" x2="21" y2="10"></line></svg></div>
+        
+        <div class="nav-icon" onclick="navigateTo('pageStickers')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg></div>
+
+        <!-- 美化 -->
+        <div class="nav-icon" onclick="navigateTo('pageBeautify')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg></div>
+        
+        <!-- 设置 -->
+        <div class="nav-icon" onclick="navigateTo('pageSettings')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></div>
+      </div>
+
+      <div class="nav-right" id="extendMenuBtn">
+        <svg class="arrow-icon" id="arrowIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </div>
+    </div>
+
+    <!-- 2. 下拉与扩展菜单 -->
+    <div class="dream-dropdown" id="dreamDropdown"></div>
+
+    <div class="extended-menu" id="extendedMenu">
+      <div class="ext-menu-row">
+        <div class="ext-menu-item" onclick="navigateTo('pageMailbox')"><div class="icon-bg"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg></div><span>信件</span></div>
+        <div class="ext-menu-item" onclick="navigateTo('pageCalendar')"><div class="icon-bg"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></div><span>日历</span></div>
+        <div class="ext-menu-item" onclick="navigateTo('pageGame')"><div class="icon-bg"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"></rect><path d="M6 12h4m-2-2v4"></path><circle cx="16" cy="12" r="1"></circle><circle cx="18" cy="14" r="1"></circle></svg></div><span>小游戏</span></div>
+       <div class="ext-menu-item" onclick="navigateTo('pageScrapbook')"><div class="icon-bg"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg></div><span>朋友圈</span></div>
+      </div>
+    </div>
+
+    <!-- ================= 核心页面容器 ================= -->
+    <div class="main-content" id="mainContent">
+
+      <!-- 1. 通讯录页面 -->
+      <div class="page" id="pageContacts">
+        <div class="page-header">
+          <button class="back-btn" onclick="goBack()">‹</button>
+          <h2>通讯录</h2>
+          <button style="background:transparent; border:none; color:var(--text); font-size:24px; font-weight:300; padding:0 10px; cursor:pointer; outline:none;" onclick="openEditDreamRole()">+</button>
+        </div>
+        <div class="page-body" id="contactList"></div>
+      </div>
+
+      <!-- 2. 编辑梦角页面 -->
+      <div class="page" id="pageEditDreamRole">
+        <div class="page-header">
+          <button class="back-btn" onclick="navigateTo('pageContacts')">‹</button>
+          <h2 id="editDreamTitle">新增梦角</h2>
+          <button class="save-btn" onclick="saveDreamRole()">保存</button>
+        </div>
+        <div class="page-body">
+          <div class="avatar-edit">
+            <img class="avatar-preview" id="dreamAvatarPreview" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Ccircle cx='40' cy='40' r='40' fill='%23ffe0e8'/%3E%3Ctext x='40' y='44' text-anchor='middle' fill='%23d6336c' font-size='28'%3E💜%3C/text%3E%3C/svg%3E" onclick="document.getElementById('dreamAvatarInput').click()">
+            <input type="file" id="dreamAvatarInput" accept="image/*" style="display:none" onchange="handleDreamAvatar(event)">
+            <span class="change-avatar-text" onclick="document.getElementById('dreamAvatarInput').click()">点击更换头像</span>
+          </div>
+          <div class="form-group">
+            <label>梦角名字</label>
+            <input type="text" id="dreamNameInput" placeholder="输入名字">
+          </div>
+                      <div class="form-group" style="margin-top:16px;">
+            <div onclick="toggleDreamStatusCollapse()" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;">
+              <label style="margin:0;cursor:pointer;">梦角状态池（<span id="dreamStatusCount">0</span> 条）</label>
+              <span id="dreamStatusArrow" style="font-size:12px;color:var(--gray);transition:transform 0.2s;">▼</span>
+            </div>
+            <div id="dreamStatusBody" style="display:none;margin-top:10px;">
+              <div id="dreamStatusList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
+              <div style="display:flex;gap:8px;">
+                <input type="text" id="newStatusInput" placeholder="输入状态，回车添加"
+                       onkeydown="if(event.key==='Enter'){event.preventDefault();addDreamStatus();}"
+                       style="flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:14px;outline:none;background:var(--card);color:var(--text);">
+                <button type="button" onclick="batchAddDreamStatus()"
+                        style="padding:10px 14px;border:1px dashed var(--border);border-radius:10px;background:transparent;color:var(--blue);font-size:13px;cursor:pointer;">批量</button>
+              </div>
+            </div>
+          </div>
+          <button class="btn-danger" onclick="deleteDreamRole()" id="deleteDreamBtn" style="display:none;margin-top:20px;">删除此梦角</button>
+        </div>
+      </div>
+
+      <!-- 3. 个人信息页面 -->
+      <div class="page" id="pageUserProfile">
+        <div class="page-header">
+          <button class="back-btn" onclick="goBack()">‹</button>
+          <h2>个人主页</h2>
+          <button class="save-btn" onclick="saveUserProfile()">保存</button>
+        </div>
+        <div class="page-body">
+          <div class="avatar-edit">
+            <img class="avatar-preview" id="userAvatarPreview" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Ccircle cx='40' cy='40' r='40' fill='%23e8e8ed'/%3E%3Ctext x='40' y='44' text-anchor='middle' fill='%2386868b' font-size='28'%3E👤%3C/text%3E%3C/svg%3E" onclick="document.getElementById('userAvatarInput').click()">
+            <input type="file" id="userAvatarInput" accept="image/*" style="display:none" onchange="handleUserAvatar(event)">
+            <span class="change-avatar-text" onclick="document.getElementById('userAvatarInput').click()">点击更换头像</span>
+          </div>
+          <div class="form-group">
+            <label>我的昵称</label>
+            <input type="text" id="userNameInput" placeholder="你的昵称">
+          </div>
+          <div class="form-group">
+            <label>我的状态</label>
+            <input type="text" id="userStatusInput" placeholder="输入个性状态">
+          </div>
+        </div>
+      </div>
+
+            <!-- 4. 聊天页面 -->
+      <div class="page" id="pageChat">
+        <!-- 加一个悬浮的右上角菜单按钮 -->
+        <button onclick="navigateTo('pageChatSettings')" style="position:absolute; top:15px; right:20px; z-index:100; width:32px; height:32px; border:none; background:transparent; font-size:24px; color:#666; cursor:pointer; display:flex; justify-content:center; align-items:center;">⋮</button>
+        
+        <div class="page-body" id="chatMessageContainer" style="background:#ededed; padding:16px; padding-top:50px; padding-bottom: 80px; box-sizing: border-box;"></div>
+      </div>
+
+      <!-- 单聊专属聊天设置页面 -->
+      <div class="page" id="pageChatSettings">
+        <div class="page-header">
+          <button class="back-btn" onclick="navigateTo('pageChat')">‹</button>
+          <h2>聊天设置</h2>
+        </div>
+        <div class="page-body" style="padding:16px; background:#f5f5f7; display:flex; flex-direction:column; gap:12px;">
+          
+          <div class="form-group" style="margin-bottom:0;">
+            <label style="font-size:13px;color:#86868b;display:block;margin-bottom:6px;">当前聊天专属 CSS 代码</label>
+            <textarea id="chatSpecificCSS" placeholder="在此粘贴只针对当前聊天的 CSS 代码" style="width:100%;height:100px;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:12px;outline:none;resize:vertical;font-family:monospace;box-sizing:border-box;"></textarea>
+          </div>
+
+          <div class="setting-item" style="background:#fff;border-radius:14px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 8px rgba(0,0,0,0.03);">
+            <div class="si-left" style="display:flex;flex-direction:column;gap:4px;">
+              <span class="si-label" style="font-size:15px;font-weight:600;color:#1d1d1f;">消息免打扰</span>
+              <span class="si-desc" style="font-size:12px;color:#86868b;">开启后不再显示红点</span>
+            </div>
+            <div class="setting-toggle" id="muteTogglePrivate" onclick="toggleMuteCurrentChat()">
+              <div class="toggle-knob"></div>
+            </div>
+          </div>
+
+          <div class="setting-item" style="background:#fff;border-radius:14px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 8px rgba(0,0,0,0.03);">
+            <div class="si-left" style="display:flex;flex-direction:column;gap:4px;">
+              <span class="si-label" style="font-size:15px;font-weight:600;color:#1d1d1f;">已读不回</span>
+              <span class="si-desc" style="font-size:12px;color:#86868b;">开启后梦角有概率看了不回</span>
+            </div>
+            <div class="setting-toggle" id="readNoReplyTogglePrivate" onclick="toggleReadNoReply()">
+              <div class="toggle-knob"></div>
+            </div>
+          </div>
+
+          <div class="setting-item" onclick="confirmClearChat()" style="background:#fff;border-radius:14px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 8px rgba(0,0,0,0.03);cursor:pointer;border:1px solid rgba(255,59,48,0.3);">
+            <div class="si-left" style="display:flex;flex-direction:column;gap:4px;">
+              <span class="si-label" style="font-size:15px;font-weight:600;color:var(--red);">清除聊天记录</span>
+              <span class="si-desc" style="font-size:12px;color:#86868b;">此操作不可恢复</span>
+            </div>
+            <div class="si-right" style="color:var(--red);font-size:18px;">›</div>
+          </div>
+
+          <button class="btn-primary" onclick="saveChatSettings()" style="margin-top:10px; width:100%; padding:14px; border-radius:14px; border:none; background:var(--blue); color:#fff; font-size:15px; font-weight:600; cursor:pointer;">保存</button>
+        </div>
+      </div>
+
+            <!-- 正在输入悬浮点 -->
+      <div id="typingIndicator" style="display:none; position:absolute; bottom: 75px; left: 16px; background: rgba(255,255,255,0.9); border-radius: 16px; padding: 6px 14px; font-size: 11px; color: #555; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 15; align-items: center; gap: 6px; backdrop-filter: blur(10px);">
+        <span id="typingName" style="font-weight: 600; color: #333;">梦角</span> 正在输入
+        <div style="display:flex; align-items:flex-end; padding-bottom:2px; height:10px;">
+          <span class="typing-dot"></span>
+          <span class="typing-dot"></span>
+          <span class="typing-dot"></span>
+        </div>
+      </div>
+
+            <!-- 5. 字卡功能 -->
+      <div class="page" id="pageWordCards">
+        <div class="page-header">
+          <button class="back-btn" onclick="goBack()">‹</button>
+          <h2>字卡</h2>
+        </div>
+        
+        <div class="page-body" style="padding:12px 16px 0;">
+          <div style="display:flex;align-items:center;margin-bottom:10px;background:var(--card);border-radius:10px;padding:8px 12px;border:1px solid var(--border);">
+            <span style="font-size:13px;color:var(--gray);margin-right:10px;white-space:nowrap;">字卡归属：</span>
+            <select id="cardOwnerSelect" onchange="switchCardOwner(this.value)" style="flex:1;border:none;background:transparent;font-size:14px;color:var(--blue);outline:none;font-weight:600;"></select>
+          </div>
+
+          <div class="card-toolbar" style="padding-top:0;">
+            <div class="card-toolbar-row">
+              <button class="card-toolbar-btn" onclick="addCategory()">+ 分类</button>
+              <button class="card-toolbar-btn" onclick="openAddCardModal()">+ 字卡</button>
+              <button class="card-toolbar-btn" onclick="dedupeCards()">去重</button>
+            </div>
+            <input class="card-search" id="cardSearchInput" type="text" placeholder="🔍 搜索字卡" oninput="onCardSearch(this.value)">
+          </div>
+
+          <div id="wordCardsContainer"></div>
+          
+          <div style="margin-top:16px; border-top:1px dashed var(--border); padding-top:16px;">
+            <label style="font-size:13px;font-weight:500;color:var(--gray);display:block;margin-bottom:4px">导入外部字卡</label>
+            <div style="display:flex; gap:8px;">
+              <button class="btn-primary" onclick="document.getElementById('importCardInput').click()" style="flex:1;">选择 JSON 文件导入</button>
+              <input type="file" id="importCardInput" accept=".json" style="display:none" onchange="handleImportCards(event)">
+            </div>
+            <div style="display:flex; gap:8px; margin-top:8px;">
+              <button class="btn-secondary" onclick="exportCards()" style="flex:1;">导出字卡为 JSON</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6. 表情包 -->
+      <div class="page" id="pageStickers">
+        <div class="page-header">
+          <button class="back-btn" onclick="goBack()">‹</button>
+          <h2>表情包</h2>
+          <button style="background:transparent; border:none; color:var(--text); font-size:24px; font-weight:300; padding:0 10px; cursor:pointer; outline:none;" onclick="addStickerGroup()">+</button>
+          <input type="file" id="stickerUpload" accept="image/*" multiple style="display:none" onchange="handleStickerUpload(event)">
+        </div>
+        <div class="page-body" id="stickerContainer"></div>
+      </div>
+
+      <!-- 其他功能占位页面 -->
+            <!-- 信箱主页 -->
+      <div class="page" id="pageMailbox">
+        <div class="page-header">
+          <button class="back-btn" onclick="goBack()">‹</button>
+          <h2>信箱</h2>
+          <button onclick="openWriteLetter()" style="background:transparent; border:none; color:var(--text); font-size:22px; cursor:pointer; padding:0 10px;">✎</button>
+        </div>
+        <!-- 收件箱 / 发件箱 Tab -->
+        <div style="display:flex; background:#fff; border-bottom:1px solid var(--border); flex-shrink:0;">
+          <div onclick="switchMailTab('inbox')" id="mailTabInbox" style="flex:1; text-align:center; padding:12px; font-size:14px; font-weight:600; color:var(--blue); border-bottom:2px solid var(--blue); cursor:pointer; position:relative;">收信箱</div>
+          <div onclick="switchMailTab('outbox')" id="mailTabOutbox" style="flex:1; text-align:center; padding:12px; font-size:14px; font-weight:600; color:var(--gray); border-bottom:2px solid transparent; cursor:pointer;">发信箱</div>
+        </div>
+        <div class="page-body" style="padding:0; flex:1; overflow-y:auto;">
+          <div id="mailList" style="display:flex; flex-direction:column;"></div>
+        </div>
+      </div>
+
+      <!-- 写信页面 -->
+      <div class="page" id="pageWriteLetter">
+        <div class="page-header">
+          <button class="back-btn" onclick="navigateTo('pageMailbox')">‹</button>
+          <h2>写信</h2>
+          <button onclick="sendLetter()" style="background:transparent; border:none; color:var(--blue); font-size:15px; font-weight:600; cursor:pointer; padding:0 10px;">发送</button>
+        </div>
+        <div class="page-body" style="padding:16px; background:#f5f5f7;">
+          <div class="form-group">
+            <label>收信人</label>
+            <select id="letterTarget" style="width:100%; padding:12px 14px; border:1px solid var(--border); border-radius:12px; font-size:15px; outline:none; background:#fff; color:var(--text);"></select>
+          </div>
+          <div class="form-group">
+            <label>信件内容</label>
+            <textarea id="letterContent" placeholder="想对TA说些什么……" style="width:100%; padding:12px 14px; border:1px solid var(--border); border-radius:12px; font-size:15px; outline:none; resize:vertical; min-height:200px; background:#fff; color:var(--text); box-sizing:border-box;"></textarea>
+          </div>
+          <div style="font-size:12px; color:#86868b; text-align:center; margin-top:10px;">信件将在 10~48 小时内送达</div>
+        </div>
+      </div>
+
+      <!-- 信件详情页面 -->
+      <div class="page" id="pageLetterDetail">
+        <div class="page-header">
+          <button class="back-btn" onclick="navigateTo('pageMailbox')">‹</button>
+          <h2 id="letterDetailTitle">信件</h2>
+        </div>
+        <div class="page-body" id="letterDetailContent" style="padding:0; background:#f5f5f7; overflow-y:auto;"></div>
+      </div>
+                  <!-- 日历主页 -->
+      <div class="page" id="pageCalendar" style="background:#f5f5f7;">
+        <div class="page-header" style="position:relative;">
+          <button class="back-btn" onclick="goBack()">‹</button>
+          <h2>日历</h2>
+          <button onclick="openAddSchedule()" style="background:transparent; border:none; color:var(--blue); font-size:24px; cursor:pointer; padding:0 10px;">+</button>
+        </div>
+
+        <!-- 头部：年月与模式切换 -->
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; padding:16px 20px 10px; background:#fff;">
+          <div style="display:flex; flex-direction:column;">
+            <div style="display:flex; align-items:center; font-size:24px; font-weight:600;">
+              <span id="calYear" style="color:#1d1d1f;">2024</span>
+              <span style="margin:0 4px; color:#ccc;">/</span>
+              <span id="calMonth" style="color:#ccc;">01</span>
+            </div>
+            <!-- 模式切换按钮 -->
+            <div onclick="toggleCalendarModeMenu()" style="font-size:13px; color:#aaa; font-weight:600; margin-top:8px; cursor:pointer;">
+              <span id="calendarModeText">农历模式</span> <span style="font-size:10px;">▼</span>
+            </div>
+          </div>
+          <div style="display:flex; gap:16px; align-items:center; height:40px;">
+            <span onclick="changeMonth(-1)" style="cursor:pointer; font-size:20px; color:#999;">‹</span>
+            <span onclick="changeMonth(1)" style="cursor:pointer; font-size:20px; color:#999;">›</span>
+          </div>
+        </div>
+
+        <!-- 模式下拉菜单 -->
+        <div id="calendarModeMenu" style="display:none; position:absolute; top:100px; left:20px; background:#fff; border-radius:12px; box-shadow:0 8px 30px rgba(0,0,0,0.12); z-index:100; padding:12px 16px; width:120px;">
+          <div class="cal-mode-item" onclick="setCalendarMode('minimal')" style="padding:8px 0; font-size:14px; color:#333; cursor:pointer;">极简模式</div>
+          <div class="cal-mode-item active" onclick="setCalendarMode('lunar')" style="padding:8px 0; font-size:14px; color:#b0b0b5; font-weight:600; cursor:pointer;">农历模式</div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(7,1fr); text-align:center; font-size:13px; font-weight:600; padding:8px 16px; background:#fff; color:#999;">
+          <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
+        </div>
+
+        <div id="calendarGrid" style="display:grid; grid-template-columns:repeat(7,1fr); padding:0 16px 16px; background:#fff; row-gap:8px;"></div>
+
+        <div style="padding:16px; flex:1; overflow-y:auto;">
+          <div style="font-size:14px; font-weight:600; color:#1d1d1f; margin-bottom:12px;" id="scheduleDateTitle">今日日程</div>
+          <div id="calendarScheduleList"></div>
+        </div>
+      </div>
+
+      <!-- 日程详情页 -->
+      <div class="page" id="pageScheduleDetail" style="background:#fff;">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding: 16px 20px;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <button class="back-btn" onclick="navigateTo('pageCalendar')" style="border:none; background:transparent; font-size:24px; cursor:pointer; color:var(--text);">‹</button>
+            <h2 style="font-size:18px; font-weight:600; margin:0;">日程详情</h2>
+          </div>
+          <div style="font-size:15px; color:var(--blue); font-weight:600; cursor:pointer;" onclick="openEditSchedule()">编辑</div>
+        </div>
+        <div style="flex:1; overflow-y:auto; padding-bottom:80px;">
+          <div style="padding: 10px 20px;">
+            <div style="background:#f8f8fa; border-radius:16px; padding:20px; margin-bottom:20px;">
+              <h1 id="schDetailTitle" style="font-size:22px; font-weight:700; margin:0 0 10px 0; color:#1d1d1f;">日程名称</h1>
+              <div id="schDetailDreamTag" style="font-size:12px; color:#007aff; margin-bottom:8px; display:none;"></div>
+              <div id="schDetailDate" style="font-size:15px; color:#86868b; margin-bottom:8px;">今天 周一</div>
+              <div id="schDetailTime" style="font-size:15px; color:#86868b; margin-bottom:16px;">15:00</div>
+              <div id="schDetailCountdown" style="font-size:13px; color:#aaa;">28分钟后开始</div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; padding: 16px 0; border-bottom:1px solid #f0f0f5;">
+              <span style="font-size:15px;">提醒方式</span>
+              <span id="schDetailRemindWay" style="font-size:15px; color:#86868b;">通知提醒</span>
+            </div>
+          </div>
+        </div>
+        <div style="position:absolute; bottom:20px; left:20px; right:20px; background:#f8f8fa; border-radius:16px; display:flex; justify-content:center; align-items:center; padding:16px; cursor:pointer;" onclick="deleteScheduleFromDetail()">
+          <span style="color:#ff3b30; font-size:16px; font-weight:600;">删除</span>
+        </div>
+      </div>
+
+      <!-- 新建/编辑日程页 -->
+      <div class="page" id="pageAddSchedule" style="background:#f5f5f7;">
+        <div class="page-header">
+          <button class="back-btn" onclick="navigateTo('pageCalendar')">‹</button>
+          <h2 id="addSchTitle">新建日程</h2>
+          <button onclick="saveNewSchedule()" style="background:transparent; border:none; color:var(--blue); font-size:15px; font-weight:600; cursor:pointer; padding:0 10px;">保存</button>
+        </div>
+        <div class="page-body" style="padding:16px;">
+          <div class="form-group">
+            <label>日程名称</label>
+            <input type="text" id="schName" placeholder="比如：和TA去看电影" style="width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); outline:none; box-sizing:border-box;">
+          </div>
+          <div class="form-group">
+            <label>开始时间</label>
+            <input type="datetime-local" id="schStartTime" style="width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); outline:none; box-sizing:border-box;">
+          </div>
+          <div class="form-group">
+            <label>提醒方式</label>
+            <select id="schRemindWay" style="width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); outline:none; background:#fff; box-sizing:border-box;">
+              <option value="notify">系统通知</option>
+              <option value="dream">梦角提醒</option>
+            </select>
+          </div>
+          <div class="form-group" id="schDreamSelectGroup" style="display:none;">
+            <label>选择提醒的梦角</label>
+            <select id="schDreamId" style="width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); outline:none; background:#fff; box-sizing:border-box;"></select>
+          </div>
+        </div>
+      </div>
+
+            <!-- 小游戏列表 -->
+      <div class="page" id="pageGame">
+        <div class="page-header">
+          <button class="back-btn" onclick="goBack()">‹</button>
+          <h2>小游戏</h2>
+        </div>
+        <div class="page-body" style="padding:16px;">
+          <!-- 五子棋入口 -->
+          <div class="game-list-card" onclick="openGomokuGame()" style="display:flex;align-items:center;background:#fff;padding:16px;border-radius:16px;box-shadow:0 2px 10px rgba(0,0,0,0.04);cursor:pointer;">
+            <div style="width:60px;height:60px;border-radius:14px;background:#e8dfff;color:#5e3cbd;display:flex;justify-content:center;align-items:center;font-size:30px;margin-right:16px;box-shadow:0 4px 10px rgba(94,60,189,0.15);">
+              <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/></svg>
+            </div>
+            <div style="flex:1;">
+              <div style="font-size:17px;font-weight:600;color:#1d1d1f;margin-bottom:4px;">五子棋</div>
+              <div style="font-size:13px;color:#86868b;">和梦角来一场紧张刺激的对弈吧</div>
+            </div>
+            <div style="color:#ccc;font-size:20px;">›</div>
+          </div>
+
+          <!-- 梦角观战入口 -->
+          <div class="game-list-card" onclick="startSpectateMatch()" style="display:flex;align-items:center;background:#fff;padding:16px;border-radius:16px;box-shadow:0 2px 10px rgba(0,0,0,0.04);cursor:pointer;margin-top:16px;">
+            <div style="width:60px;height:60px;border-radius:14px;background:#e8e8ed;color:#333;display:flex;justify-content:center;align-items:center;margin-right:16px;box-shadow:0 4px 10px rgba(0,0,0,0.05);">
+              <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </div>
+            <div style="flex:1;">
+              <div style="font-size:17px;font-weight:600;color:#1d1d1f;margin-bottom:4px;">梦角对弈</div>
+              <div style="font-size:13px;color:#86868b;">安排两个梦角下棋，你在旁边看戏</div>
+            </div>
+            <div style="color:#ccc;font-size:20px;">›</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 五子棋游戏页面 -->
+      <div class="page" id="pageGomoku" style="background:#f5f5f7;">
+        <div class="page-header" style="background:rgba(255,255,255,0.8) !important; border-bottom:1px solid #e5e5ea !important; flex-shrink: 0;">
+          <button class="back-btn" onclick="exitGomoku()">‹</button>
+          <h2>五子棋</h2>
+          <button onclick="openGomokuHistory()" style="padding:6px 12px;border:none;background:transparent;font-size:14px;cursor:pointer;color:var(--blue);font-weight:600;">历史</button>
+        </div>
+
+        <!-- 梦角信息栏 -->
+        <div style="padding:12px 16px; display:flex; justify-content:space-between; align-items:center; position:relative; z-index:50; flex-shrink: 0;">
+          <div id="gomokuDreamSelector" onclick="toggleGomokuDreamPicker(event)" style="display:flex;align-items:center;gap:10px;background:#fff;padding:8px 14px;border-radius:24px;box-shadow:0 2px 8px rgba(0,0,0,0.05);cursor:pointer;flex:1;margin-right:12px;border:1px solid #e5e5ea;">
+            <img id="gomokuDreamAvatar" src="" style="width:32px;height:32px;border-radius:50%;object-fit:cover;">
+            <div style="flex:1;min-width:0;">
+              <div id="gomokuDreamName" style="font-size:14px;font-weight:600;color:#1d1d1f;">选择梦角</div>
+              <div id="gomokuDreamStatus" style="font-size:11px;color:#86868b;">状态</div>
+            </div>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#86868b" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+
+          <div id="gomokuTurnIndicator" style="font-size:13px;font-weight:600;color:var(--blue);background:rgba(0,122,255,0.1);padding:6px 12px;border-radius:12px;white-space:nowrap;min-width:80px;text-align:center;">
+            未开始
+          </div>
+          
+          <!-- 下拉选人 -->
+          <div id="gomokuDreamDropdown" style="display:none; position:absolute; top:60px; left:16px; width:220px; background:#fff; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,0.15); z-index:999; padding: 4px 0; border: 1px solid #e5e5ea;">
+            <div id="gomokuDreamDropdownList" style="max-height:200px; overflow-y:auto; width:100%;"></div>
+          </div>
+        </div>
+
+        <!-- 棋盘区域 -->
+        <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:0 16px; overflow-y:auto;">
+          <div style="display:flex; gap:12px; align-items:center; width: 100%; max-width: 320px; justify-content: center;">
+            <div id="gomokuBoardWrapper" style="position:relative; flex: 1; aspect-ratio: 1/1; padding: 10px; box-sizing: border-box; background:#e6c280; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.15), inset 0 0 10px rgba(0,0,0,0.1);">
+              <canvas id="gomokuCanvas" style="width:100%;height:100%;display:block;touch-action:none;"></canvas>
+              <div id="gomokuClickLayer" style="position:absolute;top:10px;left:10px;width:calc(100% - 20px);height:calc(100% - 20px);cursor:pointer;z-index:5;"></div>
+              
+              <div id="gomokuStartOverlay" style="position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.3); border-radius:8px; display:flex; flex-direction:column; justify-content:center; align-items:center; z-index:10; backdrop-filter: blur(2px);">
+                <button id="gomokuStartBtn" onclick="startGomokuMatch()" style="padding:12px 32px;border-radius:24px;border:none;background:var(--blue);color:#fff;font-size:16px;font-weight:bold;box-shadow:0 4px 12px rgba(0,122,255,0.4);cursor:pointer;">开始游戏</button>
+                <div style="margin-top:12px;font-size:12px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,0.6);">随机分配黑白，黑棋先下</div>
+              </div>
+            </div>
+            
+            <div id="gomokuSideBtns" style="display:flex;flex-direction:column;gap:12px;flex-shrink:0;">
+              <button onclick="userUndo()" style="width:44px;height:44px;border-radius:50%;border:1px solid #e5e5ea;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.08);font-size:12px;font-weight:600;color:#1d1d1f;cursor:pointer;display:flex;flex-direction:column;justify-content:center;align-items:center;" id="gomokuUndoBtn">
+                <span>悔</span>
+                <span style="font-size:9px;color:#86868b;" id="gomokuUndoCount">3</span>
+              </button>
+              <button onclick="userResign()" style="width:44px;height:44px;border-radius:50%;border:1px solid #ffe0e0;background:#fff0f0;box-shadow:0 2px 8px rgba(255,59,48,0.08);font-size:12px;font-weight:600;color:#ff3b30;cursor:pointer;display:flex;justify-content:center;align-items:center;">
+                <span>认</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="gomokuUserColor" style="margin-top:16px;font-size:13px;color:#86868b;display:flex;align-items:center;gap:6px;"></div>
+        </div>
+
+        <!-- 聊天区 -->
+        <div style="height:180px;background:rgba(255,255,255,0.6);backdrop-filter:blur(15px);border-top:1px solid #e5e5ea;display:flex;flex-direction:column;flex-shrink:0;border-radius: 16px 16px 0 0;">
+          <div id="gomokuChatList" style="flex:1;overflow-y:auto;padding:10px 16px;display:flex;flex-direction:column;gap:8px;"></div>
+          <div style="padding:8px 12px;border-top:1px solid rgba(0,0,0,0.05);display:flex;gap:8px;align-items:center;">
+            <input type="text" id="gomokuChatInput" placeholder="说点什么..." style="flex:1;padding:10px 14px;border:1px solid #e5e5ea;border-radius:20px;font-size:14px;outline:none;background:#fff;" onkeydown="if(event.key==='Enter')sendGomokuChat()">
+            <button onclick="sendGomokuChat()" style="width:36px;height:36px;border-radius:50%;border:none;background:var(--blue);color:#fff;cursor:pointer;display:flex;justify-content:center;align-items:center;">➤</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 五子棋历史记录 -->
+      <div class="page" id="pageGomokuHistory" style="background:#f5f5f7;">
+        <div class="page-header">
+          <button class="back-btn" onclick="navigateTo('pageGomoku')">‹</button>
+          <h2>对弈记录</h2>
+        </div>
+        <div class="page-body" id="gomokuHistoryList" style="padding:16px; overflow-y:auto; flex: 1;"></div>
+      </div>
+
+      <!-- 观战选人弹窗 -->
+      <div id="spectateDreamPickerModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); z-index:9999; justify-content:center; align-items:center; padding:20px; box-sizing:border-box; backdrop-filter:blur(4px);">
+        <div style="background:#fff; border-radius:18px; width:100%; max-width:340px; box-shadow:0 10px 30px rgba(0,0,0,0.2); display:flex; flex-direction:column; overflow:hidden;">
+          <div style="padding:16px 20px; border-bottom:1px solid #e5e5ea; display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:16px; font-weight:700; color:#1d1d1f;">选择两名梦角对弈</span>
+            <span onclick="closeSpectateDreamPicker()" style="font-size:22px; color:#999; cursor:pointer; line-height:1;">×</span>
+          </div>
+          <div id="spectateDreamPickerList" style="padding:12px 16px; max-height:50vh; overflow-y:auto; display:flex; flex-direction:column; gap:8px;"></div>
+          <div style="padding:14px 16px; border-top:1px solid #e5e5ea; display:flex; gap:10px;">
+            <button onclick="closeSpectateDreamPicker()" style="flex:1; padding:12px; border:1px solid #e5e5ea; background:transparent; border-radius:12px; font-size:14px; color:#1d1d1f; cursor:pointer;">取消</button>
+            <button id="spectateStartBtn" onclick="confirmSpectateMatch()" style="flex:1; padding:12px; border:none; background:var(--blue); color:#fff; border-radius:12px; font-size:14px; font-weight:600; cursor:pointer; opacity:0.5;" disabled>开始对弈</button>
+          </div>
+        </div>
+      </div>
+
+            <!-- 朋友圈主页面 -->
+      <div class="page" id="pageScrapbook" style="background:#ededed; flex-direction:column; height:100%;">
+        <div class="page-header" style="background:rgba(237,237,237,0.9) !important; position:relative; display:flex; align-items:center; justify-content:center;">
+          <button class="back-btn" onclick="goBack()" style="position:absolute; left:16px;">‹</button>
+          <h2 style="text-align:center; margin:0;">朋友圈</h2>
+          <button onclick="openWriteDiary()" style="position:absolute; right:16px; width:32px; height:32px; border:none; background:transparent; font-size:20px; cursor:pointer; color:#1d1d1f; display:flex; align-items:center; justify-content:center; padding:0;">✎</button>
+        </div>
+        
+        <div class="page-body" style="padding:0; overflow-y:auto; flex:1;">
+          <!-- 封面 -->
+          <div id="diaryCover" class="diary-cover" style="height:200px; cursor:pointer; position:relative;" onclick="changeDiaryCover()">
+            <div class="diary-cover-user" style="position:absolute; right:16px; bottom:12px; display:flex; align-items:flex-end; gap:12px; z-index:2;">
+              <div style="text-align:right; padding-bottom:0;">
+                <div class="diary-cover-name" id="diaryCoverName" style="font-size:17px; font-weight:600; color:#fff; text-shadow:0 1px 4px rgba(0,0,0,0.5); margin-bottom:2px;">我</div>
+                <div class="diary-cover-status" id="diaryCoverStatus" style="font-size:12px; color:rgba(255,255,255,0.95); text-shadow:0 1px 3px rgba(0,0,0,0.5);"></div>
+              </div>
+              <img class="diary-cover-avatar" id="diaryCoverAvatar" src="" style="width:76px; height:76px; border-radius:12px; border:3px solid #fff; object-fit:cover; box-shadow:0 4px 14px rgba(0,0,0,0.2);">
+            </div>
+          </div>
+          
+          <!-- 列表 -->
+          <div id="diaryList" class="diary-list" style="background:#fff;"></div>
+          <input type="file" id="diaryCoverInput" accept="image/*" style="display:none" onchange="handleDiaryCover(event)">
+        </div>
+      </div>
+
+      <!-- 发布朋友圈页面 -->
+      <div class="page" id="pageWriteDiary" style="background:#f5f5f7;">
+        <div class="page-header">
+          <button class="back-btn" onclick="navigateTo('pageScrapbook')">‹</button>
+          <h2>发布朋友圈</h2>
+          <button onclick="saveUserDiary()" style="background:transparent; border:none; color:var(--blue); font-size:15px; font-weight:600; cursor:pointer; padding:0 10px;">发表</button>
+        </div>
+        <div class="page-body" style="padding:16px;">
+          <div class="form-group">
+                      <div class="form-group">
+            <label>今天心情如何？</label>
+            <div id="moodTags" style="display:flex;gap:8px;overflow-x:auto;padding:8px 0;scrollbar-width:none;"></div>
+          </div>
+          <div class="form-group">
+            <label>今天天气如何？</label>
+            <div id="weatherTags" style="display:flex;gap:8px;overflow-x:auto;padding:8px 0;scrollbar-width:none;"></div>
+          </div>
+            <textarea id="diaryText" placeholder="这一刻的想法..." style="width:100%; padding:12px 14px; border:1px solid var(--border); border-radius:12px; font-size:15px; outline:none; resize:vertical; min-height:150px; background:#fff; box-sizing:border-box;"></textarea>
+          </div>
+          <div class="form-group">
+            <label>添加图片（最多9张）</label>
+            <div style="display:flex; flex-wrap:wrap; gap:8px;" id="diaryImagePreviewArea">
+              <div onclick="document.getElementById('diaryImageInput').click()" style="width:70px; height:70px; background:#fff; border:1px dashed var(--border); border-radius:8px; display:flex; justify-content:center; align-items:center; font-size:24px; color:var(--gray); cursor:pointer;">+</div>
+            </div>
+            <input type="file" id="diaryImageInput" accept="image/*" multiple style="display:none" onchange="handleDiaryImageSelect(event)">
+          </div>
+        </div>
+      </div>
+
+            <!-- 美化页面 -->
+      <div class="page" id="pageBeautify">
+        <div class="page-header">
+          <button class="back-btn" onclick="goBack()">‹</button>
+          <h2>美化</h2>
+        </div>
+        <div class="page-body" style="padding:16px;">
+          
+          <!-- 全局字体大小 -->
+          <div class="form-group">
+            <label>全局字体大小 (<span id="fontSizeLabel">14</span>px)</label>
+            <input type="range" id="globalFontSize" min="8" max="20" value="14" oninput="document.getElementById('fontSizeLabel').textContent = this.value" style="width:100%;">
+          </div>
+
+          <!-- 全局气泡风格 -->
+          <div class="form-group">
+            <label>全局气泡风格</label>
+            <select id="globalBubbleStyle" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); outline:none; background:#fff;">
+              <option value="default">默认简约</option>
+              <option value="glass">半透明毛玻璃</option>
+              <option value="handdrawn">手绘描边风</option>
+            </select>
+          </div>
+
+          <!-- 全局壁纸 -->
+          <div class="form-group">
+            <label>全局壁纸（聊天背景）</label>
+            <div style="display:flex; gap:8px;">
+              <button class="btn-secondary" onclick="document.getElementById('globalWallpaperInput').click()" style="flex:1;">选择图片</button>
+              <button class="btn-secondary" onclick="resetGlobalWallpaper()" style="width:80px;">清除</button>
+            </div>
+            <input type="file" id="globalWallpaperInput" accept="image/*" style="display:none" onchange="handleGlobalWallpaper(event)">
+          </div>
+
+          <!-- 全局气泡颜色（用户） -->
+          <div class="form-group">
+            <label>全局气泡颜色（用户）</label>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input type="color" id="globalBubbleUserColor" value="#007aff" style="flex:1;height:40px;border:1px solid var(--border);border-radius:8px;padding:2px;cursor:pointer;">
+              <button class="btn-secondary" onclick="resetGlobalBubbleUser()" style="width:80px;">清除</button>
+            </div>
+          </div>
+
+          <!-- 全局气泡颜色（梦角） -->
+          <div class="form-group">
+            <label>全局气泡颜色（梦角）</label>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input type="color" id="globalBubbleDreamColor" value="#ffffff" style="flex:1;height:40px;border:1px solid var(--border);border-radius:8px;padding:2px;cursor:pointer;">
+              <button class="btn-secondary" onclick="resetGlobalBubbleDream()" style="width:80px;">清除</button>
+            </div>
+          </div>
+
+          <!-- 全局字体颜色 -->
+          <div class="form-group">
+            <label>全局字体颜色</label>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input type="color" id="globalFontColor" value="#1d1d1f" style="flex:1;height:40px;border:1px solid var(--border);border-radius:8px;padding:2px;cursor:pointer;">
+              <button class="btn-secondary" onclick="resetGlobalFontColor()" style="width:80px;">清除</button>
+            </div>
+          </div>
+
+          <!-- 全局自定义CSS -->
+          <div class="form-group">
+            <label>全局自定义气泡 CSS</label>
+            <textarea id="globalChatCSS" placeholder="所有聊天通用 CSS" style="width:100%; height:80px; padding:10px; border:1px solid var(--border); border-radius:8px; font-size:12px; outline:none; resize:vertical; font-family:monospace;"></textarea>
+            <button class="btn-secondary" onclick="resetGlobalChatCSS()" style="width:100%; margin-top:8px;">清除全局 CSS</button>
+          </div>
+
+                    <!-- 聊天小字/时间颜色 -->
+          <div class="form-group">
+            <label>聊天小字/时间颜色</label>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input type="color" id="globalSubTextColor" value="#b0b0b0" style="flex:1;height:40px;border:1px solid var(--border);border-radius:8px;padding:2px;cursor:pointer;">
+              <button class="btn-secondary" onclick="resetGlobalSubTextColor()" style="width:80px;">清除</button>
+            </div>
+          </div>
+
+          <!-- 发送按钮颜色 -->
+          <div class="form-group">
+            <label>发送按钮颜色</label>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input type="color" id="sendBtnColor" value="#007aff" style="flex:1;height:40px;border:1px solid var(--border);border-radius:8px;padding:2px;cursor:pointer;">
+              <button class="btn-secondary" onclick="resetSendBtnColor()" style="width:80px;">清除</button>
+            </div>
+          </div>
+
+          <!-- 顶部图标颜色 -->
+          <div class="form-group">
+            <label>顶部图标颜色</label>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input type="color" id="iconColor" value="#666666" style="flex:1;height:40px;border:1px solid var(--border);border-radius:8px;padding:2px;cursor:pointer;">
+              <button class="btn-secondary" onclick="resetIconColor()" style="width:80px;">清除</button>
+            </div>
+          </div>
+
+          <!-- 顶部栏透明度 -->
+          <div class="form-group">
+            <label>顶部栏不透明度 (<span id="topBarOpacityLabel">100</span>%)</label>
+            <input type="range" id="topBarOpacity" min="0" max="100" value="100" oninput="document.getElementById('topBarOpacityLabel').textContent = this.value" style="width:100%;">
+          </div>
+
+          <!-- 底部栏透明度 -->
+          <div class="form-group">
+            <label>底部输入栏不透明度 (<span id="bottomBarOpacityLabel">100</span>%)</label>
+            <input type="range" id="bottomBarOpacity" min="0" max="100" value="100" oninput="document.getElementById('bottomBarOpacityLabel').textContent = this.value" style="width:100%;">
+          </div>
+
+          <button class="btn-primary" onclick="saveBeautifySettings()" style="margin-top:20px;">保存美化设置</button>
+          <button class="btn-secondary" onclick="resetBeautifySettings()" style="margin-top:8px;">恢复默认</button>
+        </div>
+      </div>
+                  <!-- 全局设置页面 -->
+      <div class="page" id="pageSettings">
+        <div class="page-header">
+          <button class="back-btn" onclick="goBack()">‹</button>
+          <h2>设置</h2>
+        </div>
+        <div class="page-body" style="padding:16px; background:#f5f5f7;">
+          
+          <!-- 备份数据 -->
+          <div class="setting-item" onclick="backupData()">
+            <div class="si-left">
+              <span class="si-label">备份数据</span>
+              <span class="si-desc">导出数据到文件</span>
+            </div>
+            <div class="si-right">›</div>
+          </div>
+          
+          <!-- 从备份导入 -->
+          <div class="setting-item" onclick="document.getElementById('restoreInput').click()">
+            <div class="si-left">
+              <span class="si-label">从备份导入</span>
+              <span class="si-desc">恢复数据</span>
+            </div>
+            <div class="si-right">›</div>
+            <input type="file" id="restoreInput" accept=".json" style="display:none" onchange="restoreData(event)">
+          </div>
+
+          <!-- 后台消息推送 -->
+          <div class="setting-item" style="cursor:default;">
+            <div class="si-left">
+              <span class="si-label">后台消息推送</span>
+              <span class="si-desc">接收梦角的消息通知</span>
+            </div>
+            <div class="setting-toggle" id="pushToggle" onclick="togglePush()">
+              <div class="toggle-knob"></div>
+            </div>
+          </div>
+
+          <!-- 进入聊天设置 -->
+          <div class="setting-item" onclick="navigateTo('pageChatSetting')">
+            <div class="si-left">
+              <span class="si-label">聊天设置</span>
+              <span class="si-desc">情绪标签、断句、延迟等</span>
+            </div>
+            <div class="si-right">›</div>
+          </div>
+
+          <!-- 清除所有数据 -->
+          <div class="setting-item" onclick="clearAllData()" style="border:1px solid var(--red); margin-top:20px;">
+            <div class="si-left">
+              <span class="si-label" style="color:var(--red);">清除所有数据</span>
+              <span class="si-desc">恢复初始状态，不可撤销</span>
+            </div>
+            <div class="si-right" style="color:var(--red);">›</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 聊天设置页面 -->
+      <div class="page" id="pageChatSetting">
+        <div class="page-header">
+          <button class="back-btn" onclick="navigateTo('pageSettings')">‹</button>
+          <h2>聊天设置</h2>
+        </div>
+        <div class="page-body" style="padding:16px; background:#f5f5f7;">
+          
+          <div class="setting-item" style="border:1px solid var(--blue);">
+            <div class="si-left">
+              <span class="si-label">情绪标签</span>
+              <span class="si-desc">梦角说话时显示情绪标签</span>
+            </div>
+            <div class="setting-toggle" id="emotionToggle" onclick="toggleChatSetting('emotionEnabled')">
+              <div class="toggle-knob"></div>
+            </div>
+          </div>
+
+          <div class="setting-item" style="border:1px solid var(--blue);">
+            <div class="si-left">
+              <span class="si-label">自由断句</span>
+              <span class="si-desc">梦角有概率只说半句话（带渐变）</span>
+            </div>
+            <div class="setting-toggle" id="cutToggle" onclick="toggleChatSetting('cutEnabled')">
+              <div class="toggle-knob"></div>
+            </div>
+          </div>
+
+          <div class="setting-item">
+            <div class="si-left">
+              <span class="si-label">回复延迟（秒）</span>
+              <span class="si-desc">最快 ~ 最慢</span>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <input type="number" id="replyMinSec" min="0" max="60" onchange="saveNumSetting('replyMinSec', this.value)" style="width:50px;padding:6px;border-radius:8px;border:1px solid var(--border);text-align:center;outline:none;">
+              <span>~</span>
+              <input type="number" id="replyMaxSec" min="0" max="120" onchange="saveNumSetting('replyMaxSec', this.value)" style="width:50px;padding:6px;border-radius:8px;border:1px solid var(--border);text-align:center;outline:none;">
+            </div>
+          </div>
+
+          <div class="setting-item">
+            <div class="si-left">
+              <span class="si-label">主动找我</span>
+              <span class="si-desc">多久没聊就主动发消息</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <input type="number" id="autoMessageMin" min="0" placeholder="0" onchange="saveNumSetting('autoMessageMin', this.value)" style="width:60px;padding:6px;border-radius:8px;border:1px solid var(--border);text-align:center;outline:none;">
+              <span style="font-size:13px;color:var(--gray);">分钟</span>
+            </div>
+          </div>
+          
+          <div class="setting-item">
+            <div class="si-left">
+              <span class="si-label">拼接字卡</span>
+              <span class="si-desc">一次发多条字卡</span>
+            </div>
+            <div class="setting-toggle" id="cardJoinToggle" onclick="toggleChatSetting('cardJoinEnabled')">
+              <div class="toggle-knob"></div>
+            </div>
+          </div>
+          
+          <div class="setting-item">
+            <div class="si-left">
+              <span class="si-label">拼接数量</span>
+              <span class="si-desc">最少 ~ 最多</span>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <input type="number" id="cardJoinMin" min="1" max="7" onchange="saveNumSetting('cardJoinMin', this.value)" style="width:50px;padding:6px;border-radius:8px;border:1px solid var(--border);text-align:center;outline:none;">
+              <span>~</span>
+              <input type="number" id="cardJoinMax" min="1" max="7" onchange="saveNumSetting('cardJoinMax', this.value)" style="width:50px;padding:6px;border-radius:8px;border:1px solid var(--border);text-align:center;outline:none;">
+            </div>
+          </div>
+          
+          <div class="setting-item">
+            <div class="si-left">
+              <span class="si-label">梦角主动引用消息</span>
+              <span class="si-desc">有概率引用你的消息</span>
+            </div>
+            <div class="setting-toggle" id="dreamQuoteToggle" onclick="toggleChatSetting('dreamQuoteEnabled')">
+              <div class="toggle-knob"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 聊天设置页面 (图1) -->
+      <div class="page" id="pageChatSetting">
+        <div class="page-header">
+          <button class="back-btn" onclick="navigateTo('pageSettings')">‹</button>
+          <h2>聊天设置</h2>
+        </div>
+        <div class="page-body" style="padding:16px;">
+          
+          <div class="setting-item" style="display:flex;justify-content:space-between;align-items:center;border:1px solid var(--blue);">
+            <div class="si-left">
+              <span class="si-label">情绪标签</span>
+              <span class="si-desc">梦角说话时显示情绪标签</span>
+            </div>
+            <div class="setting-toggle" id="emotionToggle" onclick="toggleChatSetting('emotionEnabled')">
+              <div class="toggle-knob"></div>
+            </div>
+          </div>
+
+          <div class="setting-item" style="display:flex;justify-content:space-between;align-items:center;border:1px solid var(--blue);">
+            <div class="si-left">
+              <span class="si-label">自由断句</span>
+              <span class="si-desc">梦角有概率只说半句话（带渐变）</span>
+            </div>
+            <div class="setting-toggle" id="cutToggle" onclick="toggleChatSetting('cutEnabled')">
+              <div class="toggle-knob"></div>
+            </div>
+          </div>
+
+          <div class="setting-item" style="display:flex;justify-content:space-between;align-items:center;">
+            <div class="si-left">
+              <span class="si-label">回复延迟（秒）</span>
+              <span class="si-desc">最快几秒 ~ 最慢几秒</span>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <input type="number" id="replyMinSec" min="0" max="60" value="3" onchange="saveNumSetting('replyMinSec', this.value)" style="width:52px;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:var(--card);font-size:14px;text-align:center;outline:none;">
+              <span style="font-size:13px;color:var(--gray);">~</span>
+              <input type="number" id="replyMaxSec" min="0" max="120" value="7" onchange="saveNumSetting('replyMaxSec', this.value)" style="width:52px;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:var(--card);font-size:14px;text-align:center;outline:none;">
+            </div>
+          </div>
+
+          <div class="setting-item" style="display:flex;justify-content:space-between;align-items:center;">
+            <div class="si-left">
+              <span class="si-label">主动找我</span>
+              <span class="si-desc">你多久不理他，他就主动发消息</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <input type="number" id="autoMessageMin" min="0" placeholder="0" onchange="saveNumSetting('autoMessageMin', this.value)" style="width:60px;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:var(--card);font-size:14px;text-align:center;outline:none;">
+              <span style="font-size:13px;color:var(--gray);">分钟 (0=关闭)</span>
+            </div>
+          </div>
+          
+          <div class="setting-item" style="display:flex;justify-content:space-between;align-items:center;">
+            <div class="si-left">
+              <span class="si-label">拼接字卡</span>
+              <span class="si-desc">开启后梦角一次发多条字卡</span>
+            </div>
+            <div class="setting-toggle" id="cardJoinToggle" onclick="toggleChatSetting('cardJoinEnabled')">
+              <div class="toggle-knob"></div>
+            </div>
+          </div>
+          
+          <div class="setting-item" style="display:flex;justify-content:space-between;align-items:center;">
+            <div class="si-left">
+              <span class="si-label">拼接数量（最少 ~ 最多）</span>
+              <span class="si-desc">最多 7 条</span>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <input type="number" id="cardJoinMin" min="1" max="7" value="1" onchange="saveNumSetting('cardJoinMin', this.value)" style="width:52px;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:var(--card);font-size:14px;text-align:center;outline:none;">
+              <span style="font-size:13px;color:var(--gray);">~</span>
+              <input type="number" id="cardJoinMax" min="1" max="7" value="3" onchange="saveNumSetting('cardJoinMax', this.value)" style="width:52px;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:var(--card);font-size:14px;text-align:center;outline:none;">
+            </div>
+          </div>
+          
+          <div class="setting-item" style="display:flex;justify-content:space-between;align-items:center;">
+            <div class="si-left">
+              <span class="si-label">梦角主动引用消息</span>
+              <span class="si-desc">开启后梦角有概率引用你的消息</span>
+            </div>
+            <div class="setting-toggle" id="dreamQuoteToggle" onclick="toggleChatSetting('dreamQuoteEnabled')">
+              <div class="toggle-knob"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+            <!-- 收藏页面 -->
+      <div class="page" id="pageFavorites">
+        <div class="page-header">
+          <button class="back-btn" onclick="goBack()">‹</button>
+          <h2>收藏</h2>
+        </div>
+        <div class="page-body" id="favoritesPageList" style="padding:16px; background:#f5f5f7; flex:1; overflow-y:auto;"></div>
+      </div>
+
+            <!-- 头像库页面 -->
+      <div class="page" id="pageAvatar">
+        <div class="page-header">
+          <button class="back-btn" onclick="goBack()">‹</button>
+          <h2>头像库</h2>
+          <button onclick="toggleAvatarEdit()" id="avatarEditBtn" style="padding:6px 12px; border:none; background:transparent; font-size:13px; cursor:pointer; color:var(--blue); margin-right:4px;">编辑</button>
+          <button onclick="openAvatarImport()" style="width:32px; height:32px; border:none; background:transparent; font-size:24px; font-weight:300; cursor:pointer; color:var(--text); display:flex; align-items:center; justify-content:center;">+</button>
+        </div>
+        <div class="page-body" style="padding:12px 16px; flex:1; overflow-y:auto;">
+          <div id="avatarLibGrid" class="avatar-lib-grid"></div>
+        </div>
+        
+        <!-- 底部编辑操作条 -->
+        <div id="avatarEditBar" style="display:none; position:absolute; bottom:0; left:0; right:0; background:rgba(255,255,255,0.96); border-top:1px solid #e5e5ea; padding:14px 16px 24px; box-sizing:border-box; gap:12px; z-index:30;">
+          <button onclick="avatarSelectAll()" style="flex:1; padding:16px 10px; border-radius:14px; font-size:16px; font-weight:600; border:1px solid #e5e5ea; background:#fff; color:#1d1d1f; cursor:pointer; font-family:inherit;">全选</button>
+          <button onclick="avatarDeleteSelected()" style="flex:1; padding:16px 10px; border-radius:14px; font-size:16px; font-weight:600; border:none; background:rgba(255,59,48,0.9); color:#fff; cursor:pointer; font-family:inherit;">删除</button>
+          <button onclick="avatarCancelEdit()" style="flex:1; padding:16px 10px; border-radius:14px; font-size:16px; font-weight:600; border:1px solid #e5e5ea; background:#fff; color:#1d1d1f; cursor:pointer; font-family:inherit;">取消</button>
+        </div>
+      </div>
+
+    </div>
+
+                <!-- 5. 底部输入栏 -->
+    <div class="bottom-bar" id="bottomBar">
+
+      <!-- 扩展功能面板 (九宫格) -->
+      <div id="actionMenuPanel" style="display:none; position:absolute; bottom:60px; left:0; width:100%; background:#f7f7f7; border-radius:16px 16px 0 0; box-shadow:0 -4px 20px rgba(0,0,0,0.08); padding:16px; z-index:999; border-top:1px solid rgba(0,0,0,0.05); box-sizing:border-box;">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;text-align:center;">
+          <!-- 表情包 -->
+          <div onclick="openChatStickerPanel()" style="cursor:pointer;">
+            <div style="width:50px;height:50px;margin:0 auto 6px;background:#fff;border-radius:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.05);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1d1d1f" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M8.5 14s1.3 1.8 3.5 1.8S15.5 14 15.5 14"/><line x1="9" y1="9.5" x2="9.01" y2="9.5"/><line x1="15" y1="9.5" x2="15.01" y2="9.5"/></svg></div>
+            <div style="font-size:11px;color:#666;">表情包</div>
+          </div>
+          <!-- 拍一拍 -->
+          <div onclick="openPokePanel()" style="cursor:pointer;">
+            <div style="width:50px;height:50px;margin:0 auto 6px;background:#fff;border-radius:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.05);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1d1d1f" stroke-width="1.8"><path d="M9 11V5a1.5 1.5 0 1 1 3 0v6"/><path d="M12 11V4a1.5 1.5 0 1 1 3 0v7"/><path d="M15 11V6a1.5 1.5 0 1 1 3 0v8a7 7 0 0 1-7 7h-1a6 6 0 0 1-6-6v-3a1.5 1.5 0 1 1 3 0"/></svg></div>
+            <div style="font-size:11px;color:#666;">拍一拍</div>
+          </div>
+          <!-- 图片 -->
+          <div onclick="triggerSendImage()" style="cursor:pointer;">
+            <div style="width:50px;height:50px;margin:0 auto 6px;background:#fff;border-radius:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.05);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1d1d1f" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.3"/><path d="m4 18 5-5 4 4 3-3 4 4"/></svg></div>
+            <div style="font-size:11px;color:#666;">图片</div>
+          </div>
+            <!-- 统计 -->
+          <div onclick="openStats()" style="cursor:pointer;">
+            <div style="width:50px;height:50px;margin:0 auto 6px;background:#fff;border-radius:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.05);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1d1d1f" stroke-width="1.8"><line x1="6" y1="20" x2="6" y2="13"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="18" y1="20" x2="18" y2="9"/></svg></div>
+            <div style="font-size:11px;color:#666;">统计</div>
+          </div>
+            <!-- 状态 -->
+          <div onclick="openStatusCheck()" style="cursor:pointer;">
+            <div style="width:50px;height:50px;margin:0 auto 6px;background:#fff;border-radius:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.05);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1d1d1f" stroke-width="1.8"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-4a8 8 0 0 1-1-11 8 8 0 0 1 11-1 8 8 0 0 1 8 5z"/><path d="M9 11h.01M13 11h.01M17 11h.01"/></svg></div>
+            <div style="font-size:11px;color:#666;">状态</div>
+          </div>
+           <!-- 通话 -->
+          <div onclick="openCallPanel()" style="cursor:pointer;">
+            <div style="width:50px;height:50px;margin:0 auto 6px;background:#fff;border-radius:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.05);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1d1d1f" stroke-width="1.8"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg></div>
+            <div style="font-size:11px;color:#666;">通话</div>
+          </div>
+           <!-- 红包 -->
+          <div onclick="openRedPacketPanel()" style="cursor:pointer;">
+            <div style="width:50px;height:50px;margin:0 auto 6px;background:#fff;border-radius:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.05);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1d1d1f" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></div>
+            <div style="font-size:11px;color:#666;">红包</div>
+          </div>
+           <!-- 送礼 -->
+          <div onclick="openGiftPanel()" style="cursor:pointer;">
+            <div style="width:50px;height:50px;margin:0 auto 6px;background:#fff;border-radius:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.05);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1d1d1f" stroke-width="1.8"><rect x="3" y="9" width="18" height="12" rx="1.5"/><path d="M3 13h18"/><path d="M12 9v12"/><path d="M12 9c-2 0-4-1.5-4-3.2S10 3 12 5s4-.5 4 2.2S14 9 12 9z"/></svg></div>
+            <div style="font-size:11px;color:#666;">送礼</div>
+          </div>
+           <!-- 抉择 -->
+          <div onclick="openChoicePanel()" style="cursor:pointer;">
+            <div style="width:50px;height:50px;margin:0 auto 6px;background:#fff;border-radius:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.05);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1d1d1f" stroke-width="1.8"><line x1="12" y1="3" x2="12" y2="21"/><line x1="5" y1="6" x2="19" y2="6"/><path d="M5 6 2 13a3 3 0 0 0 6 0z"/><path d="M19 6l-3 7a3 3 0 0 0 6 0z"/><line x1="8" y1="21" x2="16" y2="21"/></svg></div>
+            <div style="font-size:11px;color:#666;">抉择</div>
+          </div>
+
+          <!-- 收藏 -->
+          <div onclick="navigateTo('pageFavorites')" style="cursor:pointer;">
+            <div style="width:50px;height:50px;margin:0 auto 6px;background:#fff;border-radius:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1d1d1f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+            </div>
+            <div style="font-size:11px;color:#666;">收藏</div>
+          </div>
+
+          <!-- 头像库 -->
+          <div onclick="navigateTo('pageAvatar')" style="cursor:pointer;">
+            <div style="width:50px;height:50px;margin:0 auto 6px;background:#fff;border-radius:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1d1d1f" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+            </div>
+            <div style="font-size:11px;color:#666;">头像库</div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- 聊天页表情包面板 (默认隐藏) -->
+      <div id="chatStickerPanel" style="display:none; position:absolute; bottom:60px; left:0; width:100%; height:260px; background:#f7f7f7; border-radius:16px 16px 0 0; box-shadow:0 -4px 20px rgba(0,0,0,0.1); z-index:999; border-top:1px solid rgba(0,0,0,0.05); box-sizing:border-box; flex-direction:column;">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 16px; border-bottom:1px solid #e5e5ea; flex-shrink:0;">
+          <div id="chatStickerTabs" style="display:flex; gap:8px; overflow-x:auto; flex:1; scrollbar-width:none;"></div>
+          <button id="chatStickerEditBtn" onclick="toggleChatStickerEditMode()" style="padding:4px 12px; border-radius:12px; border:1px solid #e5e5ea; background:#fff; color:var(--blue); font-size:12px; cursor:pointer; flex-shrink:0; margin-left:10px;">编辑</button>
+        </div>
+        <div id="chatStickerGrid" style="flex:1; overflow-y:auto; padding:12px; display:flex; flex-wrap:wrap; gap:8px; align-content:flex-start;"></div>
+      </div>
+
+      <!-- 拍一拍面板 (默认隐藏) -->
+      <div id="pokePanel" style="display:none; position:absolute; bottom:60px; left:0; width:100%; height:240px; background:#f7f7f7; border-radius:16px 16px 0 0; box-shadow:0 -4px 20px rgba(0,0,0,0.1); padding:12px; overflow-y:auto; z-index:999; border-top:1px solid rgba(0,0,0,0.05); box-sizing:border-box;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <span style="font-size:13px; font-weight:600;">拍一拍词条</span>
+          <button onclick="addPokeText()" style="font-size:12px; padding:4px 10px; border-radius:10px; border:1px solid var(--border); background:#fff; color:var(--blue); cursor:pointer;">+ 添加</button>
+        </div>
+        <div id="pokeListContainer" style="display:flex; flex-direction:column; gap:6px;"></div>
+      </div>
+
+      <!-- 底部输入区 -->
+      <div class="btn-plus" id="chatPlusBtn" onclick="toggleActionMenu()" style="width: 34px; height: 34px; border-radius: 50%; border: 1px solid #e5e5ea; background: #fff; display: flex; justify-content: center; align-items: center; cursor: pointer; color: #666; font-size: 22px; flex-shrink: 0; line-height: 1; padding-bottom: 2px; box-sizing: border-box;">+</div>
+      
+      <input type="text" class="input-box" id="chatInput" placeholder="输入消息..." onkeydown="if(event.key==='Enter')sendChatMsg()" style="flex: 1; height: 36px; background: #f0f0f5; border-radius: 18px; border: none; padding: 0 16px; font-size: 14px; outline: none; color: #333; box-shadow: none; -webkit-appearance: none; box-sizing: border-box;">
+      
+      <div class="btn-send" onclick="sendChatMsg()" style="width: 34px; height: 34px; border-radius: 50%; border: none; background: #007aff; color: #fff; display: flex; justify-content: center; align-items: center; cursor: pointer; flex-shrink: 0; box-sizing: border-box;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 2px;"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+      </div>
+    </div>
+
+        <!-- 统计弹窗（绝对居中终极版） -->
+    <div id="statsMask" style="display:none; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4); backdrop-filter:blur(2px); z-index:99999; align-items:center; justify-content:center;" onclick="closeStats()">
+      <div id="statsPanel" style="display:block; width:88%; max-width:340px; max-height:75vh; background:#fff; border-radius:20px; box-shadow:0 20px 60px rgba(0,0,0,0.3); overflow-y:auto; padding:20px; box-sizing:border-box;" onclick="event.stopPropagation()">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <span style="font-weight:600; font-size:16px;">消息统计</span>
+          <span onclick="closeStats()" style="cursor:pointer; font-size:22px; color:#999; line-height:1; padding:0 4px;">×</span>
+        </div>
+        <div id="statsContent"></div>
+      </div>
+    </div>
+
+        <!-- 状态检测弹窗 (最高层级，绝对居中) -->
+    <div id="statusMask" style="display:none; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4); backdrop-filter:blur(2px); z-index:99999; align-items:center; justify-content:center;" onclick="closeStatusCheck()">
+      <div id="statusPanel" style="display:block; width:88%; max-width:340px; max-height:80vh; background:#fff; border-radius:20px; box-shadow:0 20px 60px rgba(0,0,0,0.3); overflow-y:auto; padding:20px; box-sizing:border-box;" onclick="event.stopPropagation()">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <span style="font-weight:600; font-size:16px;">状态检测</span>
+          <span onclick="closeStatusCheck()" style="cursor:pointer; font-size:22px; color:#999; line-height:1; padding:0 4px;">×</span>
+        </div>
+        <div id="statusContent"></div>
+      </div>
+    </div>
+
+        <!-- ================= 通话全屏界面 ================= -->
+    <div id="callOverlay" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; z-index:99999; justify-content:center; align-items:center;">
+      <!-- 背景遮罩 -->
+      <div style="position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);"></div>
+      
+      <!-- 卡片 -->
+      <div id="callCard" style="position:relative; width:320px; background:rgba(255,255,255,0.75); backdrop-filter:blur(25px); -webkit-backdrop-filter:blur(25px); border:1px solid rgba(255,255,255,0.8); border-radius:28px; padding:40px 24px 32px; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.15); z-index:2; animation:popIn 0.3s ease-out;">
+        <img id="callAvatar" src="" style="width:80px; height:80px; border-radius:50%; margin:0 auto 12px; object-fit:cover; border:3px solid rgba(255,255,255,0.2);">
+        <div id="callName" style="font-size:20px; font-weight:600; color:#1d1d1f; margin-bottom:4px;">名字</div>
+        <div id="callStatus" style="font-size:13px; color:#86868b; margin-bottom:28px;">来电中…</div>
+        <div id="callTimer" style="font-size:32px; font-weight:300; color:#1d1d1f; margin-bottom:28px; display:none;">00:00:00</div>
+        
+        <!-- 按钮区 -->
+        <div id="callButtons" style="display:flex; justify-content:center; gap:60px;">
+          <!-- 由 JS 动态渲染 -->
+        </div>
+      </div>
+    </div>
+
+    <!-- 通话最小化悬浮球 -->
+    <div id="callMini" onclick="expandCall()" style="display:none; position:absolute; bottom:80px; right:20px; z-index:99998; background:rgba(255,255,255,0.95); backdrop-filter:blur(10px); border-radius:24px; padding:6px 12px 6px 6px; align-items:center; gap:8px; cursor:pointer; box-shadow:0 4px 20px rgba(0,0,0,0.15); border:1px solid rgba(255,255,255,0.8);">
+      <img id="miniAvatar" src="" style="width:32px; height:32px; border-radius:50%; object-fit:cover;">
+      <span id="miniTime" style="font-size:13px; color:#1d1d1f; font-weight:600; white-space:nowrap;">00:00</span>
+    </div>
+
+        <!-- 发红包面板 -->
+    <div id="redPacketPanel" style="display:none; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4); backdrop-filter:blur(2px); z-index:99999; align-items:center; justify-content:center;" onclick="closeRedPacketPanel()">
+      <div style="background:#fff; border-radius:18px; padding:22px; width:88%; max-width:340px; box-sizing:border-box; position:relative;" onclick="event.stopPropagation()">
+        <div style="font-size:16px; font-weight:700; text-align:center; color:#d6336c; margin-bottom:16px;">🧧 发红包</div>
+        
+        <div style="margin-bottom:12px;">
+          <label style="font-size:13px; color:#86868b; display:block; margin-bottom:4px;">金额 (元)</label>
+          <input type="number" id="rpAmount" placeholder="0.00" step="0.01" min="0.01" style="width:100%; padding:10px 14px; border:1px solid #e5e5ea; border-radius:12px; font-size:18px; font-weight:bold; outline:none; box-sizing:border-box;">
+        </div>
+        
+        <div style="margin-bottom:16px;">
+          <label style="font-size:13px; color:#86868b; display:block; margin-bottom:4px;">一句话（可选）</label>
+          <input type="text" id="rpMessage" placeholder="大吉大利，恭喜发财" style="width:100%; padding:10px 14px; border:1px solid #e5e5ea; border-radius:12px; font-size:14px; outline:none; box-sizing:border-box;">
+        </div>
+
+        <div style="display:flex; gap:8px;">
+          <button onclick="closeRedPacketPanel()" style="flex:1; padding:11px; border:1px solid #e5e5ea; background:transparent; border-radius:12px; font-size:14px; cursor:pointer; color:#1d1d1f;">取消</button>
+          <button onclick="sendRedPacket()" style="flex:1; padding:11px; border:none; background:#fa5151; color:#fff; border-radius:12px; font-size:14px; cursor:pointer; font-weight:600;">塞钱进红包</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 红包详情面板 -->
+    <div id="redPacketDetail" style="display:none; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); backdrop-filter:blur(2px); z-index:99999; align-items:center; justify-content:center;" onclick="closeRedPacketDetail()">
+      <div style="background:#fff; border-radius:18px; padding:0; width:88%; max-width:340px; overflow:hidden; box-sizing:border-box; position:relative;" onclick="event.stopPropagation()">
+        <div style="background:linear-gradient(180deg,#fa5151,#d13333); padding:24px 20px; text-align:center; color:#fff; position:relative;">
+          <div style="font-size:13px; opacity:0.85;" id="rpdSender">来自 XXX 的红包</div>
+          <div style="font-size:36px; font-weight:700; margin-top:8px;" id="rpdAmount">0.00</div>
+          <div style="font-size:12px; opacity:0.85; margin-top:6px;" id="rpdMessage">大吉大利，恭喜发财</div>
+          <span onclick="closeRedPacketDetail()" style="position:absolute; top:12px; right:14px; font-size:20px; cursor:pointer; opacity:0.8;">×</span>
+        </div>
+        <div id="rpdClaimList" style="padding:16px 20px; max-height:240px; overflow-y:auto;"></div>
+      </div>
+    </div>
+
+        <!-- 送礼主面板 -->
+    <div id="giftPanel" style="display:none; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4); backdrop-filter:blur(2px); z-index:99999; align-items:center; justify-content:center;" onclick="closeGiftPanel()">
+      <div style="background:#fff; border-radius:18px; padding:20px; width:88%; max-width:340px; max-height:80vh; display:flex; flex-direction:column; box-sizing:border-box; position:relative;" onclick="event.stopPropagation()">
+        
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <div style="font-size:16px; font-weight:700; color:#1d1d1f;">🎁 送礼</div>
+          <button id="giftEditBtn" onclick="toggleGiftEditMode()" style="font-size:13px; padding:4px 12px; border-radius:12px; border:1px solid #e5e5ea; background:#fff; color:#007aff; cursor:pointer;">编辑</button>
+        </div>
+        
+        <div id="giftListContainer" style="overflow-y:auto; flex:1; min-height:100px;"></div>
+        
+        <button onclick="closeGiftPanel()" style="margin-top:14px; padding:11px; border:1px solid #e5e5ea; background:transparent; border-radius:12px; font-size:14px; cursor:pointer; color:#1d1d1f;">取消</button>
+      </div>
+    </div>
+
+    <!-- 礼物详情弹窗 -->
+    <div id="giftDetail" style="display:none; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); backdrop-filter:blur(2px); z-index:99999; align-items:center; justify-content:center;" onclick="closeGiftDetail()">
+      <div style="background:#fff; border-radius:18px; padding:0; width:88%; max-width:340px; overflow:hidden; box-sizing:border-box; position:relative;" onclick="event.stopPropagation()">
+        <div style="background:linear-gradient(180deg,#f5f5f7,#e8e8ed); padding:26px 20px; text-align:center; position:relative;">
+          <div style="font-size:13px; color:#555;" id="gdSender">来自 XXX 的礼物</div>
+          <div style="font-size:40px; margin-top:10px;" id="gdEmoji">🎁</div>
+          <div style="font-size:18px; font-weight:700; margin-top:8px; color:#1d1d1f;" id="gdName">蛋糕 ×1</div>
+          <div style="font-size:13px; color:#fa5151; margin-top:6px; font-weight:600;" id="gdPrice">5.00 元</div>
+          <span onclick="closeGiftDetail()" style="position:absolute; top:12px; right:14px; font-size:20px; cursor:pointer; color:#999;">×</span>
+        </div>
+        <div id="gdActionArea" style="padding:16px 20px;"></div>
+      </div>
+    </div>
+
+        <!-- 抉择弹窗 -->
+    <div id="choiceModal" style="display:none; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4); backdrop-filter:blur(2px); z-index:99999; align-items:center; justify-content:center;" onclick="closeChoiceModal()">
+      <div style="background:#fff; border-radius:18px; padding:20px; width:88%; max-width:340px; box-sizing:border-box; position:relative;" onclick="event.stopPropagation()">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <span style="font-size:16px; font-weight:700; color:#1d1d1f;">抉择</span>
+          <span onclick="closeChoiceModal()" style="cursor:pointer; font-size:22px; color:#999; line-height:1;">×</span>
+        </div>
+        
+        <div style="margin-bottom:16px;">
+          <div style="font-size:13px; font-weight:600; color:#333; margin-bottom:8px;">问题</div>
+          <input type="text" id="choiceQuestionInput" placeholder="想让 TA 选什么？" style="width:100%; padding:10px 12px; border:1px solid #e5e5ea; border-radius:10px; font-size:14px; box-sizing:border-box; outline:none;">
+        </div>
+
+        <div style="margin-bottom:16px;">
+          <div style="font-size:13px; font-weight:600; color:#333; margin-bottom:8px;">选项（至少 2 个，最多 10 个）</div>
+          <div id="choiceOptionsContainer" style="display:flex; flex-direction:column; gap:8px; margin-bottom:8px;"></div>
+          <button onclick="addChoiceOption()" style="width:100%; padding:8px; border:1px dashed #e5e5ea; background:transparent; border-radius:10px; color:#007aff; font-size:13px; cursor:pointer;">+ 添加选项</button>
+        </div>
+
+        <div style="display:flex; gap:8px;">
+          <button onclick="closeChoiceModal()" style="flex:1; padding:11px; border:1px solid #e5e5ea; background:transparent; border-radius:12px; font-size:14px; cursor:pointer; color:#1d1d1f;">取消</button>
+          <button onclick="sendChoice()" style="flex:1; padding:11px; border:none; background:#007aff; color:#fff; border-radius:12px; font-size:14px; cursor:pointer; font-weight:600;">发送</button>
+        </div>
+      </div>
+    </div>
+
+        <!-- 长按消息遮罩 -->
+    <div id="msgMenuMask" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; z-index:9999; background:transparent;"></div>
+    
+    <!-- 长按消息菜单本体 -->
+    <div id="msgMenu" style="display:none; position:absolute; z-index:10000; background:#fff; border-radius:14px; box-shadow:0 8px 30px rgba(0,0,0,0.18); padding:4px; align-items:center; gap:2px; border:1px solid rgba(0,0,0,0.06);"></div>
+
+    <!-- 引用预览条 -->
+    <div id="quotePreview" style="display:none; position:absolute; bottom:60px; left:12px; right:12px; background:rgba(255,255,255,0.95); backdrop-filter:blur(10px); padding:8px 12px; border-left:3px solid var(--blue); border-radius:8px; font-size:12px; color:#666; z-index:999; box-shadow:0 -2px 10px rgba(0,0,0,0.05);">
+      <span id="quoteText"></span>
+      <span onclick="clearQuote()" style="position:absolute; top:4px; right:8px; cursor:pointer; font-size:16px; color:#999;">×</span>
+    </div>
+
+    <div id="toast">提示</div>
+  </div>
+
+    <!-- 添加字卡弹窗 -->
+    <div id="addCardModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);z-index:900;justify-content:center;align-items:center;padding:20px;box-sizing:border-box;">
+      <div style="background:#fff;border-radius:16px;padding:20px;width:100%;max-width:360px;box-sizing:border-box;">
+        <div style="font-size:15px;font-weight:600;margin-bottom:14px;color:#1d1d1f;">添加字卡</div>
+        <div style="display:flex;gap:6px;margin-bottom:14px;">
+          <button id="addCardTabSingle" onclick="switchAddCardTab('single')" style="flex:1;padding:8px;border:none;border-radius:10px;font-size:13px;cursor:pointer;background:#007aff;color:#fff;">单条</button>
+          <button id="addCardTabBatch" onclick="switchAddCardTab('batch')" style="flex:1;padding:8px;border:none;border-radius:10px;font-size:13px;cursor:pointer;background:#f0f0f5;color:#555;">批量</button>
+        </div>
+        <select id="addCardCatSelect" style="width:100%;padding:10px;border:1px solid #e5e5ea;border-radius:10px;font-size:14px;margin-bottom:10px;background:#fff;box-sizing:border-box;outline:none;"></select>
+        <input type="text" id="addCardTextInput" placeholder="输入字卡内容" onkeydown="if(event.key==='Enter')confirmAddCard()" style="width:100%;padding:10px;border:1px solid #e5e5ea;border-radius:10px;font-size:14px;margin-bottom:14px;box-sizing:border-box;outline:none;">
+        <textarea id="addCardBatchInput" placeholder="每行一条字卡" style="display:none;width:100%;padding:10px;border:1px solid #e5e5ea;border-radius:10px;font-size:14px;margin-bottom:14px;box-sizing:border-box;outline:none;min-height:120px;resize:vertical;font-family:inherit;"></textarea>
+        <div style="display:flex;gap:8px;">
+          <button onclick="closeAddCardModal()" style="flex:1;padding:10px;border:1px solid #e5e5ea;background:transparent;border-radius:10px;font-size:14px;cursor:pointer;color:#1d1d1f;">取消</button>
+          <button onclick="confirmAddCard()" style="flex:1;padding:10px;border:none;background:#007aff;color:#fff;border-radius:10px;font-size:14px;cursor:pointer;">添加</button>
+        </div>
+      </div>
+    </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
