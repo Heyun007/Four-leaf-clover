@@ -5495,7 +5495,7 @@ function endGomokuAiMatch(match, winnerId) {
 // 开启定时器
 setInterval(startRandomAiMatch, 60 * 1000);
 
-// 弹窗让用户选择收下还是拒收梦角的红包/礼物
+// ================= 终极修复收尾 =================
 function openClaimDreamPacketModal(packetId, msgIndex) {
   if (!state.currentChatId) return;
   const msgs = state.chatSessions[state.currentChatId] || [];
@@ -5506,19 +5506,13 @@ function openClaimDreamPacketModal(packetId, msgIndex) {
   if (m.refunded) return showToast('已经拒收啦');
 
   const isRp = m.type === 'dream_redpacket';
-  // 弹出系统提示框，让你选
   const action = confirm(`「${m.message || m.giftName}」\n\n你要收下这个${isRp ? '红包' : '礼物'}吗？\n点【确定】收下，点【取消】拒收。`);
 
   if (action) {
     m.claimed = true;
     saveState();
-    
-    // 纯文字提示，无任何 emoji
-    if (isRp) {
-      alert(`成功领取了 ${m.amount.toFixed(2)} 元！`);
-    } else {
-      alert(`成功收到了「${m.giftName}」！`);
-    }
+    if (isRp) alert(`成功领取了 ${m.amount.toFixed(2)} 元！`);
+    else alert(`成功收到了「${m.giftName}」！`);
     renderChatMessages();
   } else {
     m.refunded = true;
@@ -5529,5 +5523,4 @@ function openClaimDreamPacketModal(packetId, msgIndex) {
   }
 }
 
-// 启动（确保在最后调用）
 loadState();
