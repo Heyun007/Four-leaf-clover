@@ -591,6 +591,11 @@ function sendChatMsg() {
   if (window.quoteData) { newMsg.quote = window.quoteData; clearQuote(); }
 
   state.chatSessions[state.currentChatId].push(newMsg);
+  
+  // 👇 加上这一句！每次你发消息，就把这个梦角的计时器清零，重新开始算 20 分钟！
+  if (!state.lastActivityAt) state.lastActivityAt = {};
+  state.lastActivityAt[state.currentChatId] = Date.now();
+
   input.value = '';
   saveState();
   renderChatMessages();
@@ -1265,6 +1270,8 @@ function sendStickerToChat(stickerData) {
   state.chatSessions[state.currentChatId].push({ 
     from: 'user', type: 'sticker', stickerData: stickerData, time: Date.now(), status: 'unread'
   });
+    if (!state.lastActivityAt) state.lastActivityAt = {};
+  state.lastActivityAt[state.currentChatId] = Date.now();
   saveState();
   renderChatMessages();
   closeChatStickerPanel();
@@ -3479,7 +3486,7 @@ function clearAllData() {
 // ================= 主动找我定时器 =================
 // ================= 跨梦角主动发消息与通知 =================
 function checkAutoMessage() {
-  // 1. 检查是否有开启主动找我（设置里）
+  // 1. 检查是否有开启主动找我
   if (!state.settings || !state.settings.autoMessageDelay) return;
   var threshold = parseInt(state.settings.autoMessageDelay);
   if (!threshold || threshold <= 0) return;
@@ -3489,10 +3496,11 @@ function checkAutoMessage() {
 
   var now = Date.now();
   
-  // 2. 找出所有达到触发条件的梦角（包括你当前正在聊的那个）
+  // 2. 找出所有达到触发条件的梦角
   var candidates = [];
   state.dreams.forEach(function(d) {
     var lastAt = state.lastActivityAt[d.id] || 0;
+    // 如果没聊过天，或者超过设定时间
     if (now - lastAt >= threshold) candidates.push(d);
   });
   
@@ -3504,8 +3512,10 @@ function checkAutoMessage() {
   // 4. 随机抽一个寂寞的梦角
   var picked = candidates[Math.floor(Math.random() * candidates.length)];
   
-  // 5. 挑一句字卡
-  var usableCards = getUsableCards(picked.id);
+  // 5. 👇 修复报错：直接写正确的字卡过滤逻辑，不再调用不存在的 getUsableCards
+  var usableCards = state.cards.filter(function(c) {
+    return (c.dreamId || 'all') === 'all' || c.dreamId === picked.id;
+  });
   var text = usableCards.length > 0 ? usableCards[Math.floor(Math.random() * usableCards.length)].text : '你在忙吗？';
   
   // 6. 把消息存入他的聊天记录
@@ -3521,17 +3531,15 @@ function checkAutoMessage() {
   state.lastActivityAt[picked.id] = now;
   saveState();
 
-  // 7. 如果当前就在和他聊天，直接刷新画面
+  // 7. 👇 修复报错：直接刷新正确的聊天界面
   if (state.currentChatId === picked.id && document.getElementById('pageChat').classList.contains('active')) {
-    loadChatMessages();
     renderChatMessages();
   }
 
-  // 8. 刷新左侧红点和顶部下拉列表
-  try { renderChatList(); } catch(e){}
+  // 8. 刷新顶部下拉列表
   try { renderAll(); } catch(e){}
 
-  // 9. 🚨 核心：如果是别人发消息（或者你不在聊天界面），弹通知！
+  // 9. 弹通知
   var isViewingThisChat = (document.getElementById('pageChat').classList.contains('active') && state.currentChatId === picked.id);
   if (!isViewingThisChat) {
     sendNotification(picked.name, text);
