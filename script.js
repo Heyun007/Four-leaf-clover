@@ -2410,6 +2410,7 @@ function sendGift(index) {
       renderChatMessages();
     }
   }, 2000 + Math.random() * 3000);
+}
 
 function openGiftDetail(packetId) {
   if (!state.currentChatId) return;
