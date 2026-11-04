@@ -2750,8 +2750,13 @@ function renderFavoritesPage() {
   const container = document.getElementById('favoritesPageList');
   if (!container) return;
 
+  // 👇 核心修复：加上这个变量的定义，防止报错白屏！
+  const bSet = state.settings || {};
+  const subColor = bSet.globalSubTextColor || '#b0b0b0';
+
   if (!state.favorites || state.favorites.length === 0) {
-    container.innerHTML = '<div style="text-align:center; color:${subColor}; padding:60px 20px; font-size:14px;">还没有收藏任何消息<br><span style="font-size:12px; margin-top:8px; display:block;">在聊天里长按消息即可收藏</span></div>';
+    // 👇 把单引号换成了反引号，让颜色能成功解析
+    container.innerHTML = `<div style="text-align:center; color:${subColor}; padding:60px 20px; font-size:14px;">还没有收藏任何消息<br><span style="font-size:12px; margin-top:8px; display:block;">在聊天里长按消息即可收藏</span></div>`;
     return;
   }
 
@@ -2765,11 +2770,6 @@ function renderFavoritesPage() {
     // 显示是谁收藏的
     const byWhom = fav.favBy ? `由 ${fav.favBy} 收藏` : '我收藏的';
     
-    // 提取聊天对象名称
-    const chatName = fav.favBy === '我' || !fav.favBy 
-      ? '与梦角的聊天' 
-      : '梦角收藏了你的消息';
-
     return `
       <div style="background:#fff; border-radius:12px; padding:16px; border:1px solid #e5e5ea; margin-bottom:12px; box-shadow:0 2px 8px rgba(0,0,0,0.02);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
