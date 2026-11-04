@@ -11,7 +11,7 @@ let state = {
 
 // 初始化 IndexedDB 存储（使用 localforage）
 localforage.config({
-  driver: localforage.LOCALSTORAGE, // 强制使用本地存储，解决 APP 里数据保存丢失问题
+  driver: [localforage.INDEXEDDB, localforage.LOCALSTORAGE],
   name: 'MyNewApp'
 });
 
@@ -63,7 +63,23 @@ async function loadState() {
 
 // 保存数据
 function saveState() {
-  localforage.setItem('myAppState', JSON.parse(JSON.stringify(state)));
+  try {
+    const dataStr = JSON.stringify(state);
+    const sizeInMB = new TextEncoder().encode(dataStr).length / (1024 * 1024);
+    
+    if (sizeInMB > 4.8) {
+      console.warn('⚠️ 数据大小: ' + sizeInMB.toFixed(2) + 'MB，接近 localStorage 5MB 上限');
+      showToast('⚠️ 数据过大（' + sizeInMB.toFixed(1) + 'MB），可能保存失败');
+    }
+    
+    return localforage.setItem('myAppState', JSON.parse(dataStr))
+      .catch(err => {
+        console.error('❌ saveState 失败:', err);
+        showToast('❌ 保存失败：存储空间不足（' + sizeInMB.toFixed(1) + 'MB）');
+      });
+  } catch (err) {
+    console.error('❌ saveState 异常:', err);
+  }
 }
 
 // ================= 顶部导航栏交互（APP兼容增强版） =================
@@ -3357,26 +3373,60 @@ function restoreData(e) {
   reader.onload = ev => {
     try {
       let data = JSON.parse(ev.target.result);
-      
-      // 👇 核心：强行清洗会导致崩溃的 null 脏数据
-      if (!data.dreams) data.dreams = [];
-      if (!data.stickerGroups) data.stickerGroups = [];
-      if (!data.cards) data.cards = [];
-      if (!data.chatSessions) data.chatSessions = {};
-      
+
+      // 补全所有必要字段（防止 null 崩溃）
+      if (!data.dreams || !Array.isArray(data.dreams)) data.dreams = [];
+      if (!data.stickerGroups || !Array.isArray(data.stickerGroups)) data.stickerGroups = [];
+      if (!data.cards || !Array.isArray(data.cards)) data.cards = [];
+      if (!data.chatSessions || typeof data.chatSessions !== 'object') data.chatSessions = {};
+      if (!data.categories || !Array.isArray(data.categories)) data.categories = [{ id: 'default', name: '默认' }];
+      if (!data.profile || typeof data.profile !== 'object') data.profile = { name: '我', avatar: '' };
+      if (!data.settings || typeof data.settings !== 'object') data.settings = {};
+      if (!data.pokes || !Array.isArray(data.pokes)) data.pokes = ["拍了拍对方", "戳了戳脸颊"];
+      if (!data.schedules || !Array.isArray(data.schedules)) data.schedules = [];
+      if (!data.mails || !Array.isArray(data.mails)) data.mails = [];
+      if (!data.diaries || !Array.isArray(data.diaries)) data.diaries = [];
+
       state = Object.assign(state, data);
-      
-      // 强行锁死当前聊天对象
+
       if (state.dreams.length > 0) {
         state.currentChatId = state.dreams[0].id;
       }
-      
-      saveState();
-      showToast('恢复成功，正在进入聊天...');
-      setTimeout(() => location.reload(), 800);
-      
+
+      // ===== 关键：先检测大小，再真正等待保存成功 =====
+      const dataStr = JSON.stringify(state);
+      const sizeInMB = new TextEncoder().encode(dataStr).length / (1024 * 1024);
+      console.log('📦 导入数据大小:', sizeInMB.toFixed(2), 'MB');
+
+      if (sizeInMB > 4.8) {
+        alert('⚠️ 警告：导入数据 ' + sizeInMB.toFixed(1) + 'MB，超出 localStorage 5MB 上限！\n\n'
+          + '导入可能失败。\n\n建议：\n'
+          + '1. 先备份当前数据\n'
+          + '2. 清理不需要的表情包、头像库、聊天图片\n'
+          + '3. 重新导出后再导入');
+      }
+
+      // 等待真正保存完成后再刷新
+      localforage.setItem('myAppState', JSON.parse(dataStr))
+        .then(() => {
+          showToast('✅ 恢复成功，正在进入聊天...');
+          setTimeout(() => location.reload(), 800);
+        })
+        .catch(err => {
+          console.error('❌ 保存失败:', err);
+          alert('❌ 导入失败！\n\n'
+            + '原因：数据太大（' + sizeInMB.toFixed(1) + 'MB），超出 localStorage 5MB 上限。\n\n'
+            + '解决建议：\n'
+            + '1. 清理不需要的表情包分组\n'
+            + '2. 减少头像库图片\n'
+            + '3. 删除旧聊天记录里的图片\n'
+            + '4. 清理后再重新导入');
+          // 不 reload，让用户可以检查当前状态
+        });
+
     } catch (err) {
-      showToast('文件格式错误');
+      console.error('解析失败:', err);
+      showToast('文件格式错误：' + err.message);
     }
   };
   reader.readAsText(file);
