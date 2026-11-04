@@ -11,7 +11,6 @@ let state = {
 
 // 初始化 IndexedDB 存储（大容量版）
 localforage.config({
-  // 优先使用 IndexedDB，如果失败再退回 localStorage
   driver: [localforage.INDEXEDDB, localforage.LOCALSTORAGE],
   name: 'MyNewApp'
 });
@@ -65,30 +64,16 @@ async function loadState() {
 // 保存数据
 function saveState() {
   try {
+    // 直接用 JSON.stringify，不弹任何警告
     const dataStr = JSON.stringify(state);
-    const sizeInMB = new TextEncoder().encode(dataStr).length / (1024 * 1024);
     
-    // 如果数据超过 4.8MB 且当前还在用 localStorage，只弹一次警告
-    if (sizeInMB > 4.8 && localforage.driver() === localforage.LOCALSTORAGE) {
-      if (!window._hasWarnedSize) {
-        showToast('⚠️ 数据达 ' + sizeInMB.toFixed(1) + 'MB，建议清理旧图片');
-        window._hasWarnedSize = true;
-        setTimeout(() => { window._hasWarnedSize = false; }, 30000); // 30秒内不再重复弹
-      }
-    }
-    
-    return localforage.setItem('myAppState', JSON.parse(dataStr))
-      .catch(err => {
-        console.error('❌ saveState 失败:', err);
-        // 保存失败时只提示一次，防止疯狂刷屏
-        if (!window._hasWarnedError) {
-          showToast('❌ 保存失败：存储空间不足！');
-          window._hasWarnedError = true;
-          setTimeout(() => { window._hasWarnedError = false; }, 30000); 
-        }
-      });
+    // 放入后台默默保存
+    localforage.setItem('myAppState', JSON.parse(dataStr)).catch(err => {
+      console.error('❌ 保存失败:', err); 
+      // 如果真想看报错，按 F12 看控制台，别弹窗了
+    });
   } catch (err) {
-    console.error('❌ saveState 异常:', err);
+    console.error('❌ 保存异常:', err);
   }
 }
 
