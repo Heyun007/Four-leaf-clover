@@ -39,7 +39,6 @@ jobs:
         cp sw.js app/src/main/assets/ || true
         if [ -d "stickers" ]; then cp -r stickers app/src/main/assets/; fi
 
-        # 写入 MainActivity.java，修复了文件选择器兼容性
         cat > app/src/main/java/com/clover/app/MainActivity.java << 'EOF'
         package com.clover.app;
         import android.app.Activity;
@@ -66,30 +65,27 @@ jobs:
                 WebSettings ws = webView.getSettings();
                 ws.setJavaScriptEnabled(true);
                 ws.setDomStorageEnabled(true);
-                ws.setDatabaseEnabled(true); // 👈 加上这行
-                ws.setDatabasePath(getApplicationContext().getDir("databases", android.content.Context.MODE_PRIVATE).getPath()); // 👈 加上这行
                 ws.setAllowFileAccess(true);
                 ws.setAllowContentAccess(true);
                 ws.setAllowFileAccessFromFileURLs(true);
                 ws.setAllowUniversalAccessFromFileURLs(true);
 
-                // 解决「导入数据、选图片」无法打开文件选择器的问题
                 webView.setWebChromeClient(new WebChromeClient() {
                     @Override
                     public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
                         if (mUploadMessage != null) mUploadMessage.onReceiveValue(null);
                         mUploadMessage = filePathCallback;
                         
-                        // 👇 核心修复：不再调用系统的 createIntent，而是手动构建一个最通用的文件选择 Intent
-                        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+                        // 👇 终极修复：使用 ACTION_OPEN_DOCUMENT 绕过 vivo 系统的限制
+                        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                         intent.addCategory(Intent.CATEGORY_OPENABLE);
-                        intent.setType("*/*"); // 允许选择任何文件，防止部分手机不支持特定类型
+                        intent.setType("*/*"); 
                         
                         try {
                             startActivityForResult(intent, FILECHOOSER_RESULTCODE);
                         } catch (Exception e) {
                             mUploadMessage = null;
-                            Toast.makeText(MainActivity.this, "系统不支持打开文件管理器", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(MainActivity.this, "打开文件管理器失败", Toast.LENGTH_SHORT).show();
                             return false;
                         }
                         return true;
@@ -98,7 +94,6 @@ jobs:
 
                 webView.setWebViewClient(new WebViewClient());
 
-                // 解决「备份数据」无法下载的问题
                 webView.setDownloadListener((url, userAgent, contentDisposition, mimetype, contentLength) -> {
                     if (url.startsWith("blob:")) {
                         webView.evaluateJavascript("(function(){" +
@@ -111,7 +106,7 @@ jobs:
                             "    var reader = new FileReader();" +
                             "    reader.readAsDataURL(blob);" +
                             "    reader.onloadend = function() {" +
-                            "      AndroidBridge.saveBase64File(reader.result);" +
+                            "      AndroidBridge.saveAndShareFile(reader.result);" +
                             "    }" +
                             "  }" +
                             "};" +
@@ -120,10 +115,9 @@ jobs:
                     }
                 });
 
-                // 把保存文件的接口暴露给网页
                 webView.addJavascriptInterface(new Object() {
                     @android.webkit.JavascriptInterface
-                    public void saveBase64File(String base64Data) {
+                    public void saveAndShareFile(String base64Data) {
                         try {
                             String pureBase64Encoded = base64Data.substring(base64Data.indexOf(",") + 1);
                             byte[] decodedBytes = Base64.decode(pureBase64Encoded, Base64.DEFAULT);
@@ -133,9 +127,29 @@ jobs:
                             FileOutputStream fos = new FileOutputStream(file);
                             fos.write(decodedBytes);
                             fos.close();
-                            runOnUiThread(() -> Toast.makeText(MainActivity.this, "备份成功！保存在手机: " + file.getAbsolutePath(), Toast.LENGTH_LONG).show());
+                            
+                            // 👇 核心：直接调起系统的分享面板（发给微信/QQ）
+                            Uri fileUri = androidx.core.content.FileProvider.getUriForFile(
+                                MainActivity.this, 
+                                getPackageName() + ".fileprovider", 
+                                file
+                            );
+                            
+                            Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                            shareIntent.setType("application/json");
+                            shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
+                            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                            
+                            runOnUiThread(() -> {
+                                try {
+                                    startActivity(Intent.createChooser(shareIntent, "分享备份文件到..."));
+                                } catch (Exception e) {
+                                    Toast.makeText(MainActivity.this, "找不到可分享的软件，文件已保存在内部", Toast.LENGTH_LONG).show();
+                                }
+                            });
+                            
                         } catch (Exception e) {
-                            runOnUiThread(() -> Toast.makeText(MainActivity.this, "备份失败", Toast.LENGTH_SHORT).show());
+                            runOnUiThread(() -> Toast.makeText(MainActivity.this, "导出失败: " + e.getMessage(), Toast.LENGTH_SHORT).show());
                         }
                     }
                 }, "AndroidBridge");
@@ -175,7 +189,15 @@ jobs:
         </androidx.constraintlayout.widget.ConstraintLayout>
         EOF
 
-        # 增加了读取存储权限，兼容老旧安卓版本
+        # 写入 provider_paths.xml 用于分享文件
+        mkdir -p app/src/main/res/xml
+        cat > app/src/main/res/xml/provider_paths.xml << 'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <paths>
+            <external-files-path name="external_files" path="." />
+        </paths>
+        EOF
+
         cat > app/src/main/AndroidManifest.xml << 'EOF'
         <?xml version="1.0" encoding="utf-8"?>
         <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.clover.app">
@@ -183,6 +205,17 @@ jobs:
             <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
             <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
             <application android:allowBackup="true" android:icon="@mipmap/ic_launcher" android:label="四叶草" android:supportsRtl="true" android:theme="@style/Theme.AppCompat.NoActionBar" android:requestLegacyExternalStorage="true">
+                
+                <provider
+                    android:name="androidx.core.content.FileProvider"
+                    android:authorities="${applicationId}.fileprovider"
+                    android:exported="false"
+                    android:grantUriPermissions="true">
+                    <meta-data
+                        android:name="android.support.FILE_PROVIDER_PATHS"
+                        android:resource="@xml/provider_paths" />
+                </provider>
+
                 <activity android:name=".MainActivity" android:exported="true" android:configChanges="orientation|screenSize|keyboardHidden">
                     <intent-filter>
                         <action android:name="android.intent.action.MAIN" />
@@ -228,6 +261,7 @@ jobs:
         dependencies {
             implementation 'androidx.appcompat:appcompat:1.6.1'
             implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+            implementation 'androidx.core:core:1.12.0'
         }
         EOF
 
