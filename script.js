@@ -397,6 +397,9 @@ function renderChatMessages() {
     } else if (m.type === 'image') {
       bubbleContent = `<img src="${m.imageData}" style="max-width:150px; max-height:200px; border-radius:6px; object-fit:contain; display:block;">`;
     } else if (m.type === 'text') {
+      if (!m.text || m.text.trim() === '' || /^[\u200B-\u200D\uFEFF\uFFFD\u25A0\s]+$/.test(m.text)) {
+        return '';
+      }
       let textClass = '';
       if (m.cut === 'end') textClass = 'text-fade-right';
       if (m.cut === 'start') textClass = 'text-fade-left';
@@ -1252,7 +1255,7 @@ function generateAndSendMessage(chatId, isFirst) {
     if (!c.text || typeof c.text !== 'string') return false;
     const trimmed = c.text.trim();
     if (trimmed.length === 0) return false;
-    if (/[\u200B-\u200D\uFEFF\uFFFD\u25A0]/.test(trimmed)) return false;
+        if (/[\u200B-\u200D\uFEFF\uFFFD\u25A0\u25A1\uFFFC]/.test(trimmed)) return false;
     return true;
   });
 
@@ -1285,12 +1288,26 @@ function generateAndSendMessage(chatId, isFirst) {
       newMsg.text = canSendCard ? usableCards[Math.floor(Math.random() * usableCards.length)].text : '……';
     }
 
+    // 安全断句：防止切碎 Emoji 产生黑方块，同时防止切出空气泡
     if (s.cutEnabled !== false && newMsg.text.length > 1 && Math.random() < 0.5) {
-      const cutIndex = Math.floor(newMsg.text.length * (0.4 + Math.random() * 0.2));
-      if (Math.random() < 0.5) { newMsg.text = newMsg.text.slice(0, cutIndex).trim(); newMsg.cut = 'end'; } 
-      else { newMsg.text = newMsg.text.slice(cutIndex).trim(); newMsg.cut = 'start'; }
+      // 使用 Array.from 把字符串转换为真正的字符数组，这样“😀”只会被当成 1 个字符
+      const chars = Array.from(newMsg.text);
+      
+      if (chars.length > 1) {
+        const cutIndex = Math.floor(chars.length * (0.4 + Math.random() * 0.2));
+        const isCutEnd = Math.random() < 0.5;
+        
+        // 尝试截断
+        let cutText = isCutEnd ? chars.slice(0, cutIndex).join('') : chars.slice(cutIndex).join('');
+        cutText = cutText.trim();
+        
+        // 关键：如果截断后变空了（比如全是空格、标点被切走了），就不应用断句，保留原句
+        if (cutText.length > 0 && /[^\s\p{P}]/u.test(cutText)) {
+          newMsg.text = cutText;
+          newMsg.cut = isCutEnd ? 'end' : 'start';
+        }
+      }
     }
-
     if (s.emotionEnabled !== false) {
       const emotions = ['开心', '激动', '伤心', '平静', '害羞', '期待', '疲惫', '温柔', '傲娇', '疑惑', '无奈'];
       newMsg.emotion = emotions[Math.floor(Math.random() * emotions.length)];
