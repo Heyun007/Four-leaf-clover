@@ -1226,25 +1226,28 @@ let isDreamReplying = false;
 function triggerDreamReply() {
   if (!state.currentChatId) return;
 
-  // 1. 打断上一次的回复流程
   if (isDreamReplying) {
     window._replyTimers.forEach(clearTimeout);
     window._replyTimers = [];
     isDreamReplying = false;
   }
-
   isDreamReplying = true;
 
-    // 👇 新增：梦角有 15% 的概率偷偷收藏你刚刚发的消息
+  // 👇 先定义所有变量，防止报错！
+  const s = state.settings || {};
+  const typingEl = document.getElementById('typingIndicator');
+  const typingNameEl = document.getElementById('typingName');
+  const chatIdAtSend = state.currentChatId;
+  const dream = state.dreams.find(x => x.id === chatIdAtSend);
+  const dreamName = dream ? dream.name : '梦';
+  const msgs = state.chatSessions[chatIdAtSend] || [];
+
+  // 1. 梦角偷偷收藏消息
   if (Math.random() < 0.15) {
-    // 找出你最近发的一条文本、图片或表情包
     const userMsgs = msgs.filter(m => m.from === 'user' && (m.type === 'text' || m.type === 'sticker' || m.type === 'image'));
-    
     if (userMsgs.length > 0) {
       const targetMsg = userMsgs[userMsgs.length - 1];
       if (!state.favorites) state.favorites = [];
-      
-      // 防止重复收藏一样的消息
       const isExist = state.favorites.some(f => f.text === targetMsg.text && f.favBy === dreamName);
       
       if (!isExist) {
@@ -1252,47 +1255,30 @@ function triggerDreamReply() {
           id: 'fav_' + Date.now(),
           text: targetMsg.type === 'text' ? targetMsg.text : (targetMsg.type === 'sticker' ? '[表情]' : '[图片]'),
           senderName: state.profile.name || '我',
-          favBy: dreamName, // 标记是梦角收藏的
+          favBy: dreamName,
           time: Date.now()
         });
         saveState();
         
-        // 过几秒钟，在聊天框里弹出一句小字提示你
         setTimeout(() => {
           if (state.currentChatId === chatIdAtSend) {
-            msgs.push({ 
-              from: 'system', 
-              type: 'text', 
-              text: `「${dreamName}」悄悄收藏了你的消息`, 
-              time: Date.now() 
-            });
+            msgs.push({ from: 'system', type: 'text', text: `「${dreamName}」悄悄收藏了你的消息`, time: Date.now() });
             saveState();
             renderChatMessages();
           }
-        }, 3000 + Math.random() * 2000); // 3~5秒后提示
+        }, 3000);
       }
     }
   }
 
-  const s = state.settings || {};
-  const typingEl = document.getElementById('typingIndicator');
-  const typingNameEl = document.getElementById('typingName');
-  const chatIdAtSend = state.currentChatId;
-  const dream = state.dreams.find(x => x.id === chatIdAtSend);
-  const dreamName = dream ? dream.name : '梦';
-
-  // 2. 把用户消息标记为已读
-  const msgs = state.chatSessions[chatIdAtSend] || [];
+  // 2. 标记已读
   let hasUnread = false;
   msgs.forEach(m => { if (m.from === 'user' && m.status === 'unread') { m.status = 'read'; hasUnread = true; } });
   if (hasUnread) { saveState(); renderChatMessages(); }
 
-  // 3. 真正读取「已读不回」开关（这是原来漏掉的核心）
+  // 3. 已读不回
   const cs = (state.chatSettingsMap || {})[chatIdAtSend] || {};
-  const readNoReply = !!cs.readNoReply;
-
-  // 如果开了已读不回，10% 概率：装模作样打两秒字，然后彻底不回
-  if (readNoReply && Math.random() < 0.1) {
+  if (cs.readNoReply && Math.random() < 0.1) {
     if (typingNameEl) typingNameEl.textContent = dreamName;
     if (typingEl) typingEl.style.display = 'flex';
     const fakeTyping = setTimeout(() => {
@@ -1305,24 +1291,19 @@ function triggerDreamReply() {
 
   const minS = s.replyMinSec != null ? s.replyMinSec : 3;
   const maxS = s.replyMaxSec != null ? s.replyMaxSec : 7;
-
-  // 4. 回复条数更自然：60% 一条 / 30% 两条 / 10% 三条
   const rnd = Math.random();
   const replyCount = rnd < 0.6 ? 1 : (rnd < 0.9 ? 2 : 3);
 
   function sendNextMessage(index) {
-    // 中途被打断就退出
     if (state.currentChatId !== chatIdAtSend || !isDreamReplying) {
       isDreamReplying = false;
       if (typingEl) typingEl.style.display = 'none';
       return;
     }
 
-    // 显示"正在输入"
     if (typingNameEl) typingNameEl.textContent = dreamName;
     if (typingEl) typingEl.style.display = 'flex';
 
-    // ★ 关键修改：动画持续时长 = 设置的回复延迟，一秒不差
     const delayMs = (minS + Math.random() * (maxS - minS)) * 1000;
 
     const waitTimer = setTimeout(() => {
@@ -1332,12 +1313,10 @@ function triggerDreamReply() {
         return;
       }
 
-      // ★ 关键修改：同一帧内隐藏动画 + 发消息，动画消失 = 消息立刻出现
       if (typingEl) typingEl.style.display = 'none';
       generateAndSendMessage(chatIdAtSend, index === 0);
 
       if (index + 1 < replyCount) {
-        // 下一条消息：略微停顿后继续显示输入动画
         const nextTimer = setTimeout(() => {
           if (state.currentChatId === chatIdAtSend && isDreamReplying) {
             sendNextMessage(index + 1);
@@ -3370,25 +3349,35 @@ function restoreData(e) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = ev => {
-    let data;
+    let parsedData;
     try {
-      data = JSON.parse(ev.target.result);
+      parsedData = JSON.parse(ev.target.result);
     } catch(err) {
       showToast('文件格式错误');
       e.target.value = '';
       return;
     }
     
-    Object.assign(state, data);
+    state = parsedData;
     
-    // 👇 导入后强行修复状态：如果有梦角，强行把 currentChatId 设为第一个梦角的 ID
-    if (state.dreams && state.dreams.length > 0) {
+    // 补全缺失数据
+    if (!state.profile) state.profile = { name: '我', avatar: '' };
+    if (!state.dreams) state.dreams = [];
+    if (!state.chatSessions) state.chatSessions = {};
+    if (!state.categories) state.categories = [{ id: 'default', name: '默认' }];
+    if (!state.stickerGroups) state.stickerGroups = [];
+    
+    // 强行把当前聊天设回第一个梦角
+    if (state.dreams.length > 0) {
       state.currentChatId = state.dreams[0].id;
     }
     
     saveState();
     showToast('恢复成功，即将刷新');
-    setTimeout(() => location.reload(), 1000);
+    
+    setTimeout(() => {
+      location.reload();
+    }, 800);
   };
   reader.readAsText(file);
   e.target.value = '';
