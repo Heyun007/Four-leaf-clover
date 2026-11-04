@@ -2519,16 +2519,22 @@ function choiceDreamAnswer(packetId, chatId) {
 // ================= 智能返回功能 =================
 function goBack() {
   // 如果有正在聊天的梦角，就回聊天界面
-  if (state.currentChatId && state.dreams.some(d => d.id === state.currentChatId)) {
-    navigateTo('pageChat');
-  } 
-  // 如果没聊天记录但有梦角，就进第一个梦角的聊天
-  else if (state.dreams.length > 0) {
-    openChat(state.dreams[0].id);
-  } 
-  // 如果连梦角都没有，就回通讯录
-  else {
-    navigateTo('pageContacts');
+  try {
+    if (state.dreams.length > 0) {
+      if (!state.currentChatId || !state.dreams.some(d => d.id === state.currentChatId)) {
+        state.currentChatId = state.dreams[0].id;
+      }
+      openChat(state.currentChatId);
+    } else {
+      navigateTo('pageContacts');
+    }
+  } catch (err) {
+    console.error("进入聊天报错，已强行拦截:", err);
+    if (state.dreams.length > 0) {
+      navigateTo('pageChat');
+    } else {
+      navigateTo('pageContacts');
+    }
   }
 }
 
@@ -3349,52 +3355,34 @@ function restoreData(e) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = ev => {
-    let data;
     try {
-      data = JSON.parse(ev.target.result);
-    } catch(err) {
-      showToast('文件格式错误，解析失败');
-      e.target.value = '';
-      return;
+      let data = JSON.parse(ev.target.result);
+      
+      // 👇 核心：强行清洗会导致崩溃的 null 脏数据
+      if (!data.dreams) data.dreams = [];
+      if (!data.stickerGroups) data.stickerGroups = [];
+      if (!data.cards) data.cards = [];
+      if (!data.chatSessions) data.chatSessions = {};
+      
+      state = Object.assign(state, data);
+      
+      // 强行锁死当前聊天对象
+      if (state.dreams.length > 0) {
+        state.currentChatId = state.dreams[0].id;
+      }
+      
+      saveState();
+      showToast('恢复成功，正在进入聊天...');
+      setTimeout(() => location.reload(), 800);
+      
+    } catch (err) {
+      showToast('文件格式错误');
     }
-    
-    // 深度合并数据，防止备份文件缺失字段导致报错
-    if (data) {
-      Object.keys(data).forEach(key => {
-        state[key] = data[key];
-      });
-    }
-    
-    // 👇 强行清理可能存在的脏数据（null 等），防止导入后网页崩溃
-    if (!state.profile) state.profile = { name: '我', avatar: '', status: '在线' };
-    if (!Array.isArray(state.dreams)) state.dreams = [];
-    if (!Array.isArray(state.cards)) state.cards = [];
-    if (!Array.isArray(state.categories)) state.categories = [{ id: 'default', name: '默认' }];
-    if (!state.chatSessions || typeof state.chatSessions !== 'object') state.chatSessions = {};
-    if (!Array.isArray(state.stickerGroups)) state.stickerGroups = [];
-    if (!Array.isArray(state.mails)) state.mails = [];
-    if (!Array.isArray(state.diaries)) state.diaries = [];
-    if (!state.settings || typeof state.settings !== 'object') state.settings = {};
-    
-    // 去除梦角里的 null
-    state.dreams = state.dreams.filter(d => d !== null && d !== undefined);
-    state.dreams.forEach(d => { 
-      if (!d.statuses || !Array.isArray(d.statuses)) d.statuses = []; 
-      if (!d.currentStatus) d.currentStatus = '在线'; 
-    });
-
-    // 强行把当前聊天设回第一个梦角
-    if (state.dreams.length > 0) {
-      state.currentChatId = state.dreams[0].id;
-    }
-    
-    saveState();
-    showToast('恢复成功，即将刷新');
-    setTimeout(() => location.reload(), 800);
   };
   reader.readAsText(file);
   e.target.value = '';
 }
+
 function clearAllData() {
   if (!confirm('确定要清除所有数据吗？不可撤销！')) return;
   localforage.clear().then(() => {
