@@ -25,41 +25,38 @@ async function loadState() {
   } catch (e) {
     console.log('读取数据失败', e);
   }
-      // 读取完后补齐缺失的数组，防止报错
+
+  // 👇 极其强壮的防崩溃清理（把 null 全都转成默认值）
   if (!state.profile) state.profile = { name: '我', avatar: '', status: '在线' };
-  if (!state.dreams) state.dreams = [];
-  if (!state.cards) state.cards = [];
-  if (!state.categories) state.categories = [{ id: 'default', name: '默认' }];
-  if (!state.chatSessions) state.chatSessions = {};
-  if (!state.stickerGroups) state.stickerGroups = [];
-  if (!state.schedules) state.schedules = [];
-  if (!state.mails) state.mails = [];
-  if (!state.diaries) state.diaries = [];
-  if (!state.settings) state.settings = {};
-  if (!state.pokes) state.pokes = ["拍了拍对方", "戳了戳脸颊", "摸了摸头"];
-  
-  if (state.dreams) {
-    state.dreams.forEach(d => { 
-      if (!d.statuses) d.statuses = []; 
-      if (!d.currentStatus) d.currentStatus = '在线'; 
-    });
-  }
-      renderAll();
-    
-    // 👇 加上这三行补丁，确保大退重进后数据加载完毕再涂抹壁纸
-    setTimeout(() => { try { applyBeautifySettings(); } catch(e) {} }, 500);
-    setTimeout(() => { try { applyBeautifySettings(); } catch(e) {} }, 1500);
-    setTimeout(() => { try { applyBeautifySettings(); } catch(e) {} }, 3000);
-  
-  // ===== 新增：自动进入聊天逻辑 =====
-  if (state.currentChatId && state.dreams.some(d => d.id === state.currentChatId)) {
-    // 有上次聊天的梦角，直接进那个
+  if (!state.dreams || !Array.isArray(state.dreams)) state.dreams = [];
+  if (!state.cards || !Array.isArray(state.cards)) state.cards = [];
+  if (!state.categories || !Array.isArray(state.categories)) state.categories = [{ id: 'default', name: '默认' }];
+  if (!state.chatSessions || typeof state.chatSessions !== 'object') state.chatSessions = {};
+  if (!state.stickerGroups || !Array.isArray(state.stickerGroups)) state.stickerGroups = [];
+  if (!state.schedules || !Array.isArray(state.schedules)) state.schedules = [];
+  if (!state.mails || !Array.isArray(state.mails)) state.mails = [];
+  if (!state.diaries || !Array.isArray(state.diaries)) state.diaries = [];
+  if (!state.settings || typeof state.settings !== 'object') state.settings = {};
+  if (!state.pokes || !Array.isArray(state.pokes)) state.pokes = ["拍了拍对方", "戳了戳脸颊"];
+
+  // 清理梦角里的脏数据
+  state.dreams = state.dreams.filter(d => d !== null && d !== undefined);
+  state.dreams.forEach(d => { 
+    if (!d.statuses || !Array.isArray(d.statuses)) d.statuses = []; 
+    if (!d.currentStatus) d.currentStatus = '在线'; 
+  });
+
+  renderAll();
+  setTimeout(() => { try { applyBeautifySettings(); } catch(e) {} }, 500);
+
+  // 👇 强制进聊天逻辑：只要有一个梦角，无论如何都进他的聊天！
+  if (state.dreams.length > 0) {
+    // 如果上次聊的梦角丢了，直接强行拉第一个梦角
+    if (!state.currentChatId || !state.dreams.some(d => d.id === state.currentChatId)) {
+      state.currentChatId = state.dreams[0].id;
+    }
     openChat(state.currentChatId);
-  } else if (state.dreams.length > 0) {
-    // 有梦角，但没记录，进第一个
-    openChat(state.dreams[0].id);
   } else {
-    // 连梦角都没有，直接跳去通讯录让你加
     navigateTo('pageContacts');
   }
 }
@@ -278,7 +275,7 @@ function openEditDreamRole(id = null) {
   document.getElementById('editDreamTitle').textContent = id ? '编辑梦角' : '新增梦角';
   document.getElementById('dreamNameInput').value = d ? d.name : '';
     window._dreamStatusCollapsed = true;
-  window._tempStatuses = d && d.statuses ? d.statuses.slice() : [];
+  window._tempStatuses = (d && d.statuses && Array.isArray(d.statuses)) ? d.statuses.slice() : [];
   renderDreamStatusList();
   document.getElementById('dreamAvatarPreview').src = d && d.avatar ? d.avatar : 'data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2780%27 height=%2780%27 viewBox=%270 0 80 80%27%3E%3Ccircle cx=%2740%27 cy=%2740%27 r=%2740%27 fill=%27%23ffe0e8%27/%3E%3Ctext x=%2740%27 y=%2744%27 text-anchor=%27middle%27 fill=%27%23d6336c%27 font-size=%2728%27%3E💜%3C/text%3E%3C/svg%3E';
   document.getElementById('deleteDreamBtn').style.display = id ? 'block' : 'none';
@@ -3373,15 +3370,25 @@ function restoreData(e) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = ev => {
+    let data;
     try {
-      const data = JSON.parse(ev.target.result);
-      Object.assign(state, data);
-      saveState();
-      showToast('恢复成功，即将刷新');
-      setTimeout(() => location.reload(), 1000);
+      data = JSON.parse(ev.target.result);
     } catch(err) {
       showToast('文件格式错误');
+      e.target.value = '';
+      return;
     }
+    
+    Object.assign(state, data);
+    
+    // 👇 导入后强行修复状态：如果有梦角，强行把 currentChatId 设为第一个梦角的 ID
+    if (state.dreams && state.dreams.length > 0) {
+      state.currentChatId = state.dreams[0].id;
+    }
+    
+    saveState();
+    showToast('恢复成功，即将刷新');
+    setTimeout(() => location.reload(), 1000);
   };
   reader.readAsText(file);
   e.target.value = '';
