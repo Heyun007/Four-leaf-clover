@@ -25,11 +25,20 @@ async function loadState() {
   } catch (e) {
     console.log('读取数据失败', e);
   }
-    if (state.profile && !state.profile.status) state.profile.status = '在线';
+      // 读取完后补齐缺失的数组，防止报错
+  if (!state.profile) state.profile = { name: '我', avatar: '', status: '在线' };
+  if (!state.dreams) state.dreams = [];
+  if (!state.cards) state.cards = [];
+  if (!state.categories) state.categories = [{ id: 'default', name: '默认' }];
+  if (!state.chatSessions) state.chatSessions = {};
+  if (!state.stickerGroups) state.stickerGroups = [];
+  if (!state.schedules) state.schedules = [];
+  if (!state.mails) state.mails = [];
+  if (!state.diaries) state.diaries = [];
+  if (!state.settings) state.settings = {};
+  if (!state.pokes) state.pokes = ["拍了拍对方", "戳了戳脸颊", "摸了摸头"];
+  
   if (state.dreams) {
-    state.dreams.forEach(d => { if (!d.status) d.status = '在线'; });
-  }
-    if (state.dreams) {
     state.dreams.forEach(d => { 
       if (!d.statuses) d.statuses = []; 
       if (!d.currentStatus) d.currentStatus = '在线'; 
@@ -270,7 +279,6 @@ function openEditDreamRole(id = null) {
   document.getElementById('dreamNameInput').value = d ? d.name : '';
     window._dreamStatusCollapsed = true;
   window._tempStatuses = d && d.statuses ? d.statuses.slice() : [];
-  if (!d && !d.statuses) window._tempStatuses = []; // 兜底新建
   renderDreamStatusList();
   document.getElementById('dreamAvatarPreview').src = d && d.avatar ? d.avatar : 'data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2780%27 height=%2780%27 viewBox=%270 0 80 80%27%3E%3Ccircle cx=%2740%27 cy=%2740%27 r=%2740%27 fill=%27%23ffe0e8%27/%3E%3Ctext x=%2740%27 y=%2744%27 text-anchor=%27middle%27 fill=%27%23d6336c%27 font-size=%2728%27%3E💜%3C/text%3E%3C/svg%3E';
   document.getElementById('deleteDreamBtn').style.display = id ? 'block' : 'none';
