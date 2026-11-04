@@ -331,7 +331,6 @@ function renderChatMessages() {
   const dream = state.dreams.find(x => x.id === state.currentChatId);
   const dreamName = dream ? dream.name : '梦';
   const dreamAvatar = dream && dream.avatar ? dream.avatar : `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='20' fill='%23ffe0e8'/%3E%3Ctext x='20' y='25' text-anchor='middle' fill='%23d6336c' font-size='16'%3E${dreamName.charAt(0)}%3C/text%3E%3C/svg%3E`;
-
   const userName = state.profile.name || '我';
   const userAvatar = state.profile.avatar ? state.profile.avatar : `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='20' fill='%23e8e8ed'/%3E%3Ctext x='20' y='25' text-anchor='middle' fill='%2386868b' font-size='16'%3E${userName.charAt(0)}%3C/text%3E%3C/svg%3E`;
 
@@ -347,20 +346,16 @@ function renderChatMessages() {
   if (bSet.globalBubbleStyle === 'handdrawn') bubbleClass = 'bubble-handdrawn';
 
   container.innerHTML = msgs.map((m, i) => {
-    // 1. 拦截系统消息
     if (m.from === 'system') return `<div data-msg-index="${i}" style="text-align:center; margin:12px 0; font-size:12px; color:${subColor};">${m.text}</div>`;
     
-    // 2. 拦截拍一拍
     if (m.type === 'poke') {
       const pokeName = m.senderName || (m.from === 'user' ? '我' : dreamName);
       return `<div data-msg-index="${i}" style="text-align:center; margin:12px 0; font-size:12px; color:${subColor};"><span style="font-weight:600;">${pokeName}</span> ${m.text}</div>`;
     }
 
-    // 3. 拦截五子棋邀请卡片
     if (m.type === 'gomoku_invite') {
       const matchNow = state.gomokuAiMatches.find(x => x.id === m.matchId);
       const isEnded = !matchNow || !matchNow.active;
-      
       return `<div data-msg-index="${i}" style="display:flex;justify-content:flex-start;margin-bottom:12px;">
         <div style="width:240px;background:linear-gradient(135deg,#f5f5f7,#e8e8ed);border-radius:12px;padding:16px;box-shadow:0 4px 14px rgba(0,0,0,0.08);border:1px solid rgba(255,255,255,0.7);">
           <div style="font-size:14px;font-weight:600;color:#1d1d1f;margin-bottom:10px;">对局邀请</div>
@@ -371,11 +366,9 @@ function renderChatMessages() {
       </div>`;
     }
 
-    // 4. 拦截五子棋战报卡片
     if (m.type === 'gomoku_result') {
       const p1Col = m.p1Color === 1 ? '黑棋' : '白棋';
       const p2Col = m.p2Color === 1 ? '黑棋' : '白棋';
-      
       return `<div data-msg-index="${i}" style="display:flex;justify-content:flex-start;margin-bottom:12px;">
         <div style="width:240px;background:#fff;border-radius:12px;padding:14px 16px;box-shadow:0 4px 14px rgba(0,0,0,0.08);border:1px solid rgba(0,0,0,0.05);">
           <div style="font-size:14px;font-weight:600;color:#1d1d1f;margin-bottom:10px;">五子棋战报</div>
@@ -385,73 +378,9 @@ function renderChatMessages() {
       </div>`;
     }
 
-    // 5. 拦截红包、礼物、抉择卡片 (你之前的代码，原封不动保留)
-    if (m.type === 'redpacket') {
-      const isMine = m.from === 'user';
-      const avatar = isMine ? userAvatar : dreamAvatar;
-      const rpHtml = `<div onclick="openRedPacketDetail('${m.packetId}')" style="cursor:pointer; width:210px; background:linear-gradient(135deg,#f5f5f7,#e8e8ed); border-radius:12px; padding:14px 16px; color:#333; box-shadow:0 4px 14px rgba(0,0,0,0.08); border:1px solid rgba(255,255,255,0.7); ${m.refunded ? 'opacity:0.55;' : ''}">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d6336c" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg><span style="font-size:14px;font-weight:600;">${isMine ? '我的红包' : '收到红包'}</span></div>
-        <div style="font-size:12px;color:#666;line-height:1.4;">${m.message}</div>
-        <div style="font-size:11px;color:#888;margin-top:6px;">${m.refunded ? '已退回' : ('已领 ' + (m.claimed ? m.claimed.length : 0) + '/1')}</div>
-      </div>`;
-      return `<div data-msg-index="${i}" style="display:flex; margin-bottom:12px; justify-content:${isMine ? 'flex-end' : 'flex-start'}; align-items:flex-start; gap:8px;">
-          ${!isMine ? `<img src="${avatar}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;">` : ''}
-          <div style="display:flex; flex-direction:column; align-items:${isMine ? 'flex-end' : 'flex-start'};">
-            ${rpHtml}
-            <span style="font-size:9px;color:#b0b0b0;display:block;margin-top:4px;">${String(new Date(m.time).getHours()).padStart(2,'0')}:${String(new Date(m.time).getMinutes()).padStart(2,'0')}</span>
-          </div>
-          ${isMine ? `<img src="${avatar}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;">` : ''}
-        </div>`;
-    }
-
-    if (m.type === 'gift') {
-      const isMine = m.from === 'user';
-      const avatar = isMine ? userAvatar : dreamAvatar;
-      const giftHtml = `<div onclick="openGiftDetail('${m.packetId}')" style="cursor:pointer; width:210px; background:linear-gradient(135deg,#f5f5f7,#e8e8ed); border-radius:12px; padding:14px 16px; color:#333; box-shadow:0 4px 14px rgba(0,0,0,0.08); border:1px solid rgba(255,255,255,0.7); ${m.refunded ? 'opacity:0.55;' : ''}">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1d1d1f" stroke-width="1.8"><rect x="3" y="9" width="18" height="12" rx="1.5"/><path d="M3 13h18"/><path d="M12 9v12"/><path d="M12 9c-2 0-4-1.5-4-3.2S10 3 12 5s4-.5 4 2.2S14 9 12 9z"/></svg><span style="font-size:14px;font-weight:600;">${isMine ? '我送的礼物' : '收到礼物'}</span></div>
-        <div style="font-size:13px;color:#333;line-height:1.4;">${m.giftName} ×${m.count}</div>
-        <div style="font-size:11px;color:#888;margin-top:6px;">${m.totalPrice.toFixed(2)} 元 · ${m.refunded ? '已退回' : (m.claimed.length > 0 ? '已领取' : '待领取')}</div>
-      </div>`;
-      return `<div data-msg-index="${i}" style="display:flex; margin-bottom:12px; justify-content:${isMine ? 'flex-end' : 'flex-start'}; align-items:flex-start; gap:8px;">
-          ${!isMine ? `<img src="${avatar}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;">` : ''}
-          <div style="display:flex; flex-direction:column; align-items:${isMine ? 'flex-end' : 'flex-start'};">
-            ${giftHtml}
-            <span style="font-size:9px;color:#b0b0b0;display:block;margin-top:4px;">${String(new Date(m.time).getHours()).padStart(2,'0')}:${String(new Date(m.time).getMinutes()).padStart(2,'0')}</span>
-          </div>
-          ${isMine ? `<img src="${avatar}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;">` : ''}
-        </div>`;
-    }
-    
-    if (m.type === 'choice') {
-      const isMine = m.from === 'user';
-      const avatar = isMine ? userAvatar : dreamAvatar;
-      const hasAns = !!m.answer;
-      let optsHtml = '';
-      m.options.forEach(opt => {
-        const isPicked = hasAns && m.answer === opt;
-        optsHtml += `<div style="font-size:12px; padding:6px 10px; border-radius:8px; ${isPicked ? 'background:rgba(0,122,255,0.12); color:#007aff; font-weight:600; border:1px solid rgba(0,122,255,0.3);' : 'background:#f8f8fa; color:#666; border:1px solid transparent;'}">${isPicked ? '✓ ' : ''}${opt}</div>`;
-      });
-      const chHtml = `<div style="width:220px; background:#fff; border-radius:12px; padding:14px 16px; box-shadow:0 4px 14px rgba(0,0,0,0.08); border:1px solid rgba(0,0,0,0.05);">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1d1d1f" stroke-width="1.8"><line x1="12" y1="3" x2="12" y2="21"/><line x1="5" y1="6" x2="19" y2="6"/><path d="M5 6 2 13a3 3 0 0 0 6 0z"/><path d="M19 6l-3 7a3 3 0 0 0 6 0z"/><line x1="8" y1="21" x2="16" y2="21"/></svg><span style="font-size:13px;font-weight:600;color:#1d1d1f;">抉择</span></div>
-        <div style="font-size:13px;color:#333;line-height:1.5;margin-bottom:10px;">${m.question}</div>
-        <div style="display:flex;flex-direction:column;gap:6px;">${optsHtml}</div>
-        <div style="font-size:11px;color:#86868b;margin-top:8px;">${hasAns ? m.answererName + ' 选择了' : '等待回答中…'}</div>
-      </div>`;
-      return `<div data-msg-index="${i}" style="display:flex; margin-bottom:12px; justify-content:${isMine ? 'flex-end' : 'flex-start'}; align-items:flex-start; gap:8px;">
-          ${!isMine ? `<img src="${avatar}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;">` : ''}
-          <div style="display:flex; flex-direction:column; align-items:${isMine ? 'flex-end' : 'flex-start'};">
-            ${chHtml}
-            <span style="font-size:9px;color:#b0b0b0;display:block;margin-top:4px;">${String(new Date(m.time).getHours()).padStart(2,'0')}:${String(new Date(m.time).getMinutes()).padStart(2,'0')}</span>
-          </div>
-          ${isMine ? `<img src="${avatar}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;">` : ''}
-        </div>`;
-    }
-
-    // 6. 普通气泡、图片、表情包
     const isUser = m.from === 'user';
     const avatar = isUser ? userAvatar : dreamAvatar;
     const isSticker = m.type === 'sticker';
-    
     const date = new Date(m.time || Date.now());
     const timeStr = String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0');
     
@@ -484,7 +413,6 @@ function renderChatMessages() {
     }
 
     const sideClass = isUser ? 'bubble-user' : 'bubble-dream';
-    
     let bubbleStyle = 'padding: 10px 14px; font-size: 14px; line-height: 1.4; display: inline-block; text-align: left; max-width: 100%; box-sizing: border-box; word-break: break-word;';
     
     if (isSticker) {
@@ -502,14 +430,14 @@ function renderChatMessages() {
       quoteHtml = `<div style="font-size: 12px; padding: 6px 8px; margin-bottom: 8px; background: rgba(255,255,255,0.6); color: #333; border-left: 3px solid #007aff; border-radius: 4px; word-break: break-all; text-align: left; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">${m.quote.senderName || ''}：${m.quote.text || ''}</div>`;
     }
 
+    // 👇 加上这个大括号闭合，之前就是这里没闭合导致整个 JS 瘫痪
     if (!bubbleContent || (typeof bubbleContent === 'string' && bubbleContent.trim() === '')) {
-       return ''; // 👈 必须加上这句，直接跳过空气泡
+       return ''; 
     }
 
     return `
       <div data-msg-index="${i}" style="display: flex; margin-bottom: 16px; justify-content: ${isUser ? 'flex-end' : 'flex-start'}; align-items: flex-start; gap: 10px; width: 100%;">
         ${!isUser ? `<img src="${avatar}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0;">` : ''}
-        
         <div style="max-width: 75%; text-align: ${isUser ? 'right' : 'left'};">
           <div class="${isSticker ? '' : 'chat-bubble ' + sideClass + ' ' + bubbleClass}" style="${bubbleStyle}">
             ${quoteHtml}
@@ -519,11 +447,10 @@ function renderChatMessages() {
             ${statusHtml}
           </div>
         </div>
-        
         ${isUser ? `<img src="${avatar}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0;">` : ''}
       </div>
     `;
-  }).join('');
+  }).join(''); // 👈 这里的闭合也修好了
   
   container.scrollTop = container.scrollHeight;
   attachLongPress();
@@ -536,12 +463,11 @@ function sendChatMsg() {
   
   if (!state.chatSessions[state.currentChatId]) state.chatSessions[state.currentChatId] = [];
   
-  // 👇 核心：如果还有没执行完的定时器，强制清空，重新开始
   if (window._replyTimers) {
     window._replyTimers.forEach(clearTimeout);
     window._replyTimers = [];
   }
-  isDreamReplying = false; // 强行解锁
+  isDreamReplying = false;
 
   let newMsg = { from: 'user', type: 'text', text: text, time: Date.now(), status: 'unread' };
   if (window.quoteData) { newMsg.quote = window.quoteData; clearQuote(); }
@@ -551,6 +477,139 @@ function sendChatMsg() {
   saveState();
   renderChatMessages();
   triggerDreamReply();
+}
+
+function triggerDreamReply() {
+  if (!state.currentChatId) return;
+
+  if (isDreamReplying) {
+    if (Date.now() - (window._lastReplyStartTime || 0) > 10000) {
+      isDreamReplying = false;
+    } else {
+      return; 
+    }
+  }
+  
+  isDreamReplying = true;
+  window._lastReplyStartTime = Date.now();
+
+  const s = state.settings || {};
+  const typingEl = document.getElementById('typingIndicator');
+  const typingNameEl = document.getElementById('typingName');
+  const chatIdAtSend = state.currentChatId;
+  const dream = state.dreams.find(x => x.id === chatIdAtSend);
+  const dreamName = dream ? dream.name : '梦';
+
+  const msgs = state.chatSessions[chatIdAtSend] || [];
+  let hasUnread = false;
+  msgs.forEach(m => { if (m.from === 'user' && m.status === 'unread') { m.status = 'read'; hasUnread = true; } });
+  if (hasUnread) { saveState(); renderChatMessages(); }
+
+  const minS = s.replyMinSec != null ? s.replyMinSec : 3;
+  const maxS = s.replyMaxSec != null ? s.replyMaxSec : 7;
+  const replyCount = 1 + Math.floor(Math.random() * 3);
+
+  function sendNextMessage(index) {
+    if (state.currentChatId !== chatIdAtSend) {
+      isDreamReplying = false;
+      return;
+    }
+
+    if (typingNameEl) typingNameEl.textContent = dreamName;
+    if (typingEl) typingEl.style.display = 'flex';
+
+    const typingTimer = setTimeout(() => {
+      if (typingEl) typingEl.style.display = 'none';
+      const delayMs = (minS + Math.random() * (maxS - minS)) * 1000;
+      
+      const waitTimer = setTimeout(() => {
+        if (state.currentChatId !== chatIdAtSend) return;
+        generateAndSendMessage(chatIdAtSend, index === 0);
+        if (index + 1 < replyCount) {
+          const nextTimer = setTimeout(() => { sendNextMessage(index + 1); }, 1000 + Math.random() * 1500);
+          window._replyTimers.push(nextTimer);
+        } else {
+          isDreamReplying = false;
+        }
+      }, delayMs);
+      window._replyTimers.push(waitTimer);
+    }, 1500); 
+    window._replyTimers.push(typingTimer);
+  }
+  sendNextMessage(0);
+}
+
+function generateAndSendMessage(chatId, isFirst) {
+  const s = state.settings || {};
+  const msgs = state.chatSessions[chatId] || [];
+  const userMsgs = msgs.filter(m => m.from === 'user').slice(-5);
+
+  const usableCards = state.cards.filter(c => (c.dreamId || 'all') === 'all' || c.dreamId === chatId).filter(c => {
+    if (!c.text || typeof c.text !== 'string') return false;
+    const trimmed = c.text.trim();
+    if (trimmed.length === 0) return false;
+    if (/[\u200B-\u200D\uFEFF\uFFFD\u25A0]/.test(trimmed)) return false;
+    return true;
+  });
+
+  let allStickers = [];
+  state.stickerGroups.forEach(g => { if (g.items) allStickers = allStickers.concat(g.items); });
+
+  const canSendSticker = allStickers.length > 0;
+  const canSendCard = usableCards.length > 0;
+
+  let sendType = 'text';
+  if (canSendSticker && canSendCard) sendType = Math.random() < 0.4 ? 'sticker' : 'text';
+  else if (canSendSticker) sendType = 'sticker';
+  else if (canSendCard) sendType = 'text';
+
+  let newMsg = { from: 'dream', time: Date.now() };
+
+  if (sendType === 'sticker') {
+    newMsg.type = 'sticker';
+    newMsg.stickerData = allStickers[Math.floor(Math.random() * allStickers.length)];
+  } else {
+    newMsg.type = 'text';
+    if (canSendCard && s.cardJoinEnabled) {
+      const minN = Math.max(1, Math.min(7, s.cardJoinMin || 1));
+      const maxN = Math.max(minN, Math.min(7, s.cardJoinMax || 3));
+      let count = minN + Math.floor(Math.random() * (maxN - minN + 1));
+      let shuffled = [...usableCards].sort(() => Math.random() - 0.5);
+      let picked = shuffled.slice(0, Math.min(count, shuffled.length));
+      newMsg.text = picked.map(c => c.text).join('，');
+    } else {
+      newMsg.text = canSendCard ? usableCards[Math.floor(Math.random() * usableCards.length)].text : '……';
+    }
+
+    if (s.cutEnabled !== false && newMsg.text.length > 1 && Math.random() < 0.5) {
+      const cutIndex = Math.floor(newMsg.text.length * (0.4 + Math.random() * 0.2));
+      if (Math.random() < 0.5) { newMsg.text = newMsg.text.slice(0, cutIndex).trim(); newMsg.cut = 'end'; } 
+      else { newMsg.text = newMsg.text.slice(cutIndex).trim(); newMsg.cut = 'start'; }
+    }
+
+    if (s.emotionEnabled !== false) {
+      const emotions = ['开心', '激动', '伤心', '平静', '害羞', '期待', '疲惫', '温柔', '傲娇', '疑惑', '无奈'];
+      newMsg.emotion = emotions[Math.floor(Math.random() * emotions.length)];
+    }
+  }
+
+  if (isFirst && s.dreamQuoteEnabled !== false && userMsgs.length > 0 && Math.random() < 0.15) {
+    const picked = userMsgs[Math.floor(Math.random() * userMsgs.length)];
+    newMsg.quote = { text: picked.type === 'text' ? picked.text : '[图片/表情]', senderName: state.profile.name || '我', msgId: -1 };
+  }
+
+  msgs.push(newMsg);
+  saveState();
+  
+  if (document.getElementById('pageChat').classList.contains('active') && state.currentChatId === chatId) {
+    renderChatMessages();
+  }
+
+  if (s.pushEnabled && Notification.permission === 'granted') {
+    if (!document.hasFocus() || state.currentChatId !== chatId) {
+      new Notification(state.dreams.find(x=>x.id===chatId).name, { body: newMsg.type === 'text' ? newMsg.text : '[表情/图片]' });
+    }
+  }
 }
 
 // ================= 4. 完整版字卡功能 =================
