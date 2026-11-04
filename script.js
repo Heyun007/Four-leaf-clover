@@ -3968,6 +3968,15 @@ if (!state.gomokuHistory) state.gomokuHistory = [];
 if (!state.gomokuAiMatches) state.gomokuAiMatches = [];
 
 function openGomokuGame() {
+  // 🚨 进入游戏时，自动清理昨天或卡死超过 20 分钟的对局
+  if (state.gomokuAiMatches) {
+    var now = Date.now();
+    state.gomokuAiMatches.forEach(function(m) {
+      if (m.active && now - m.startTime > 20 * 60 * 1000) {
+        endGomokuAiMatch(m, 'draw');
+      }
+    });
+  }
   navigateTo('pageGomoku');
   resetGomokuGame();
 }
@@ -4294,6 +4303,31 @@ function evaluateGomokuPoint(x, y, color) {
   return score;
 }
 
+// 新增：用于后台对弈的独立算分函数
+function evaluateGomokuPointBoard(board, x, y, color) {
+  var score = 0, dirs = [[1,0], [0,1], [1,1], [1,-1]];
+  for (var i = 0; i < 4; i++) {
+    var count = 1, block1 = 0, block2 = 0;
+    for (var j = 1; j < 5; j++) { 
+      var nx = x + dirs[i][0] * j, ny = y + dirs[i][1] * j; 
+      if (nx < 0 || nx >= 15 || ny < 0 || ny >= 15) { block1 = 1; break; } 
+      if (board[ny][nx] === color) count++; else if (board[ny][nx] === 0) break; else { block1 = 1; break; } 
+    }
+    for (var j = 1; j < 5; j++) { 
+      var nx = x - dirs[i][0] * j, ny = y - dirs[i][1] * j; 
+      if (nx < 0 || nx >= 15 || ny < 0 || ny >= 15) { block2 = 1; break; } 
+      if (board[ny][nx] === color) count++; else if (board[ny][nx] === 0) break; else { block2 = 1; break; } 
+    }
+    var blocks = block1 + block2;
+    if (count >= 5) score += 10000000; 
+    else if (count === 4) { if (blocks === 0) score += 1000000; else if (blocks === 1) score += 100000; }
+    else if (count === 3) { if (blocks === 0) score += 8000; else if (blocks === 1) score += 1000; }
+    else if (count === 2) { if (blocks === 0) score += 500; else if (blocks === 1) score += 100; }
+    else if (count === 1) { if (blocks === 0) score += 10; }
+  }
+  return score;
+}
+
 function addGomokuChat(sender, text, senderId) { gomoku.chats.push({sender, text, senderId}); renderGomokuChats(); }
 
 function renderGomokuChats() {
@@ -4475,6 +4509,20 @@ function renderGomokuHistoryList() {
 window._spectateSelectedIds = [];
 function startSpectateMatch() {
   if (!state.dreams || state.dreams.length < 2) return showToast('至少需要两个梦角');
+  // 🚨 清理过期对局
+  if (state.gomokuAiMatches) {
+    var now = Date.now();
+    state.gomokuAiMatches.forEach(function(m) {
+      if (m.active && now - m.startTime > 20 * 60 * 1000) {
+        endGomokuAiMatch(m, 'draw');
+      }
+    });
+  }
+
+  var activeMatch = state.gomokuAiMatches.find(m => m.active);
+  if (activeMatch) {
+    if (confirm('当前有正在进行的梦角对局，是否直接进入观战？')) { enterSpectateMode(activeMatch.id); return; }
+  }
   var activeMatch = state.gomokuAiMatches.find(m => m.active);
   if (activeMatch) {
     if (confirm('当前有正在进行的梦角对局，是否直接进入观战？')) { enterSpectateMode(activeMatch.id); return; }
@@ -5056,6 +5104,91 @@ function createGomokuAiMatch(d1, d2, triggerChatId) {
   }
   
   runAiMatchEngine(matchId);
+}
+
+// ===== 重写：绝对健壮的 AI 对弈引擎 =====
+window._aiMatchTimers = window._aiMatchTimers || {};
+
+function runAiMatchEngine(matchId) {
+  var match = state.gomokuAiMatches.find(m => m.id === matchId);
+  if (!match || !match.active) return;
+
+  // 清理可能残留的旧定时器
+  if (window._aiMatchTimers[matchId]) clearTimeout(window._aiMatchTimers[matchId]);
+
+  function step() {
+    var m = state.gomokuAiMatches.find(x => x.id === matchId);
+    if (!m || !m.active) return;
+
+    // 🚨 核心防护：如果对局超过 15 分钟，强制判平局，防止死锁
+    if (Date.now() - m.startTime > 15 * 60 * 1000) {
+      endGomokuAiMatch(m, 'draw');
+      return;
+    }
+
+    var maxMy = -1, maxEnemy = -1;
+    var bestMy = [], bestEnemy = [];
+    
+    // 寻找最佳落子
+    for (var y = 0; y < 15; y++) {
+      for (var x = 0; x < 15; x++) {
+        if (m.board[y][x] === 0) {
+          var myS = evaluateGomokuPointBoard(m.board, x, y, m.turnColor);
+          var enS = evaluateGomokuPointBoard(m.board, x, y, m.turnColor === 1 ? 2 : 1);
+          if (myS > maxMy) { maxMy = myS; bestMy = [{x, y}]; } else if (myS === maxMy) bestMy.push({x, y});
+          if (enS > maxEnemy) { maxEnemy = enS; bestEnemy = [{x, y}]; } else if (enS === maxEnemy) bestEnemy.push({x, y});
+        }
+      }
+    }
+
+    var move = null;
+    if (maxMy >= 10000000) move = bestMy[Math.floor(Math.random() * bestMy.length)];
+    else if (maxEnemy >= 10000000) move = bestEnemy[Math.floor(Math.random() * bestEnemy.length)];
+    else if (maxMy >= 1000000) move = bestMy[Math.floor(Math.random() * bestMy.length)];
+    else if (maxEnemy >= 1000000) move = bestEnemy[Math.floor(Math.random() * bestEnemy.length)];
+    else {
+      var bestScore = -1, bestMoves = [];
+      for (var y = 0; y < 15; y++) {
+        for (var x = 0; x < 15; x++) {
+          if (m.board[y][x] === 0) {
+            var score = evaluateGomokuPointBoard(m.board, x, y, m.turnColor) + evaluateGomokuPointBoard(m.board, x, y, m.turnColor === 1 ? 2 : 1) * 0.8 + Math.random();
+            if (score > bestScore) { bestScore = score; bestMoves = [{x, y}]; } else if (score === bestScore) bestMoves.push({x, y});
+          }
+        }
+      }
+      if (bestMoves.length > 0) move = bestMoves[Math.floor(Math.random() * bestMoves.length)];
+    }
+
+    if (!move) { endGomokuAiMatch(m, 'draw'); return; }
+
+    // 落子
+    m.board[move.y][move.x] = m.turnColor;
+    m.moves.push({x: move.x, y: move.y, color: m.turnColor});
+
+    // 检查输赢
+    if (checkGomokuWinBoard(m.board, move.x, move.y, m.turnColor)) {
+      var winnerId = m.turnColor === m.p1Color ? m.p1Id : m.p2Id;
+      endGomokuAiMatch(m, winnerId);
+      return;
+    }
+
+    // 换手
+    m.turnColor = m.turnColor === 1 ? 2 : 1;
+    saveState();
+
+    // 如果你正在看这局，就刷新画面
+    if (gomoku.mode === 'spectate' && gomoku.spectateMatchId === matchId) {
+      gomoku.board = m.board;
+      gomoku.currentTurn = m.turnColor;
+      drawGomokuBoard();
+      updateGomokuUI();
+    }
+
+    // 准备下一步
+    window._aiMatchTimers[matchId] = setTimeout(step, 800 + Math.random() * 1500);
+  }
+
+  step();
 }
 
 // 修改 endGomokuAiMatch（发送战报卡片）
