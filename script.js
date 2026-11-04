@@ -435,7 +435,6 @@ function renderChatMessages() {
     
     // 👇 完美复刻截图极简 UI：统一处理用户和梦角的红包/礼物卡片
     if (m.type === 'redpacket' || m.type === 'dream_redpacket' || m.type === 'gift' || m.type === 'dream_gift') {
-      const isUser = m.from === 'user';
       const isRp = m.type === 'redpacket' || m.type === 'dream_redpacket';
       
       const amount = isUser ? (isRp ? m.totalAmount : m.totalPrice) : (m.amount || 0);
@@ -2443,27 +2442,6 @@ function openGiftDetail(packetId) {
 
 function closeGiftDetail() {
   document.getElementById('giftDetail').style.display = 'none';
-}
-
-// 👇 新增：领取梦角发的红包/礼物
-function claimDreamPacket(packetId, msgIndex) {
-  if (!state.currentChatId) return;
-  const msgs = state.chatSessions[state.currentChatId] || [];
-  const m = msgs[msgIndex];
-  if (!m || m.claimed) return; // 如果已经领了就不管
-
-  m.claimed = true; // 标记为已领取
-  saveState();
-
-  // 弹窗提示
-  if (m.type === 'dream_redpacket') {
-    alert(`🎉 成功领取了 ${m.amount.toFixed(2)} 元！`);
-  } else {
-    alert(`🎁 成功收到了「${m.giftName}」！`);
-  }
-
-  // 刷新界面，让卡片文字变成“已领取”
-  renderChatMessages();
 }
 
 // ================= 抉择功能 =================
@@ -5531,31 +5509,16 @@ function openClaimDreamPacketModal(packetId, msgIndex) {
   // 弹出系统提示框，让你选
   const action = confirm(`「${m.message || m.giftName}」\n\n你要收下这个${isRp ? '红包' : '礼物'}吗？\n点【确定】收下，点【取消】拒收。`);
 
-  // 弹窗让用户选择收下还是拒收梦角的红包/礼物
-function openClaimDreamPacketModal(packetId, msgIndex) {
-  if (!state.currentChatId) return;
-  const msgs = state.chatSessions[state.currentChatId] || [];
-  const m = msgs[msgIndex];
-  
-  if (!m) return;
-  if (m.claimed) return showToast('已经收下啦');
-  if (m.refunded) return showToast('已经拒收啦');
-
-  const isRp = m.type === 'dream_redpacket';
-  // 弹出系统提示框，让你选
-  const action = confirm(`「${m.message || m.giftName}」\n\n你要收下这个${isRp ? '红包' : '礼物'}吗？\n点【确定】收下，点【取消】拒收。`);
-
   if (action) {
     m.claimed = true;
     saveState();
     
-    // 👇 终极纯文字版，绝对没有任何 emoji
+    // 纯文字提示，无任何 emoji
     if (isRp) {
       alert(`成功领取了 ${m.amount.toFixed(2)} 元！`);
     } else {
       alert(`成功收到了「${m.giftName}」！`);
     }
-    
     renderChatMessages();
   } else {
     m.refunded = true;
