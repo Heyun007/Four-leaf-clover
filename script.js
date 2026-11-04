@@ -593,7 +593,7 @@ function renderCards() {
     filteredCats.forEach(function(cat) {
       var cards = filteredCards.filter(function(c) { return c.cat === cat.id; });
       var catBlocked = cat.blocked || false;
-      var collapsed = cat.collapsed || false; // 取折叠状态
+      var collapsed = cat.collapsed || false;
 
       var cardsHtml = '';
       if (cards.length === 0) {
@@ -604,23 +604,24 @@ function renderCards() {
         cardsHtml += '</div>';
       }
 
-            groupsHtml += '<div class="category-group' + (catBlocked ? ' blocked' : '') + '">';
+      // 完美版本的头部代码，绝不误触
+      groupsHtml += '<div class="category-group' + (catBlocked ? ' blocked' : '') + '">';
       groupsHtml += '<div class="category-header" style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px;">';
       
-      // 👇 左侧区域：只有点名字才能折叠
+      // 左侧：点名字折叠
       groupsHtml += '<div onclick="toggleCategory(\'' + cat.id + '\')" style="flex:1; cursor:pointer; display:flex; align-items:center; padding:4px 0;">';
       groupsHtml += '<span class="cat-name">' + cat.name + '（' + cards.length + '）</span>';
       groupsHtml += '</div>';
 
-      // 👇 右侧区域：屏蔽、删除、箭头彻底分开
+      // 右侧：屏蔽、删除、折叠箭头
       groupsHtml += '<div class="cat-actions" style="display:flex; align-items:center; gap:12px;">';
       groupsHtml += '<span class="cat-action" onclick="toggleBlockCategory(\'' + cat.id + '\')" title="屏蔽本组">' + (catBlocked ? '🔇' : '🔊') + '</span>';
       groupsHtml += '<span class="cat-action" onclick="deleteCategory(\'' + cat.id + '\')" title="删除本组">🗑</span>';
-      
-      // 👇 箭头单独绑定折叠事件，并去掉了 pointer-events: none
       groupsHtml += '<span class="cat-toggle' + (collapsed ? ' collapsed' : '') + '" onclick="toggleCategory(\'' + cat.id + '\')" style="cursor:pointer; font-size:12px; padding:4px;">▼</span>'; 
-      
       groupsHtml += '</div></div>';
+
+      // 👇👇👇 这就是我之前弄丢的两行代码！！！补上了字卡内容的渲染和闭合括号！
+      groupsHtml += '<div class="category-body' + (collapsed ? ' hidden' : '') + '">' + cardsHtml + '</div></div>'; 
     });
 
     if (filteredCats.length === 0) {
