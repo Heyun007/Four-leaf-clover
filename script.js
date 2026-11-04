@@ -10,7 +10,10 @@ let state = {
 };
 
 // 初始化 IndexedDB 存储（使用 localforage）
-localforage.config({ name: 'MyNewApp' });
+localforage.config({
+  driver: localforage.LOCALSTORAGE, // 强制使用本地存储，解决 APP 里数据保存丢失问题
+  name: 'MyNewApp'
+});
 
 // 读取保存的数据
 async function loadState() {
@@ -57,54 +60,71 @@ function saveState() {
   localforage.setItem('myAppState', JSON.parse(JSON.stringify(state)));
 }
 
-// 顶部导航栏交互
+// ================= 顶部导航栏交互（APP兼容增强版） =================
 const dreamAvatarBtn = document.getElementById('dreamAvatarBtn');
 const dreamDropdown = document.getElementById('dreamDropdown');
 const extendMenuBtn = document.getElementById('extendMenuBtn');
 const extendedMenu = document.getElementById('extendedMenu');
 const arrowIcon = document.getElementById('arrowIcon');
 
-dreamAvatarBtn.addEventListener('click', function(e) {
-  e.stopPropagation(); 
-  if (state.dreams.length === 0) {
-    dreamDropdown.classList.remove('show');
-    showToast('暂无梦角，请前往通讯录添加');
-    return;
-  }
-  
-  dreamDropdown.innerHTML = '';
-  state.dreams.forEach(dream => {
-    const item = document.createElement('div');
-    item.className = 'dream-item';
-    item.onclick = function() { openChat(dream.id); };
-    item.innerHTML = `
-      <div class="avatar-circle" style="${dream.avatar ? `background-image:url(${dream.avatar});background-size:cover;background-position:center;` : ''}">${dream.avatar ? '' : dream.name.charAt(0)}</div>
-      <div style="display: flex; align-items: baseline; gap: 6px; flex: 1; min-width: 0;">
-        <div class="name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60px;">${dream.name}</div>
-        <div class="status" style="font-size: 10px; color: #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${dream.currentStatus || '在线'}</div>
-      </div>
-    `;
-    dreamDropdown.appendChild(item);
-  });
-  dreamDropdown.classList.toggle('show');
-  extendedMenu.classList.remove('show');
-  arrowIcon.classList.remove('open');
-});
+// 1. 点击左上角头像
+if (dreamAvatarBtn) {
+  dreamAvatarBtn.onclick = function(e) {
+    if (e) e.stopPropagation();
+    if (state.dreams.length === 0) {
+      if (dreamDropdown) dreamDropdown.classList.remove('show');
+      showToast('暂无梦角，请前往通讯录添加');
+      return;
+    }
+    
+    dreamDropdown.innerHTML = '';
+    state.dreams.forEach(dream => {
+      const item = document.createElement('div');
+      item.className = 'dream-item';
+      item.onclick = function(ev) { 
+        if(ev) ev.stopPropagation();
+        openChat(dream.id); 
+      };
+      item.innerHTML = `
+        <div class="avatar-circle" style="${dream.avatar ? `background-image:url(${dream.avatar});background-size:cover;background-position:center;` : ''}">${dream.avatar ? '' : dream.name.charAt(0)}</div>
+        <div style="display: flex; align-items: baseline; gap: 6px; flex: 1; min-width: 0;">
+          <div class="name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60px;">${dream.name}</div>
+          <div class="status" style="font-size: 10px; color: #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${dream.currentStatus || '在线'}</div>
+        </div>
+      `;
+      dreamDropdown.appendChild(item);
+    });
+    
+    dreamDropdown.classList.toggle('show');
+    extendedMenu.classList.remove('show');
+    arrowIcon.classList.remove('open');
+  };
+}
 
-extendMenuBtn.addEventListener('click', function(e) {
-  e.stopPropagation();
-  extendedMenu.classList.toggle('show');
-  arrowIcon.classList.toggle('open');
-  dreamDropdown.classList.remove('show');
-});
+// 2. 点击右上角展开箭头
+if (extendMenuBtn) {
+  extendMenuBtn.onclick = function(e) {
+    if (e) e.stopPropagation();
+    extendedMenu.classList.toggle('show');
+    arrowIcon.classList.toggle('open');
+    if (dreamDropdown) dreamDropdown.classList.remove('show');
+  };
+}
 
+// 3. 点击空白处关闭所有菜单
 document.addEventListener('click', function() {
-  dreamDropdown.classList.remove('show');
-  extendedMenu.classList.remove('show');
-  arrowIcon.classList.remove('open');
+  if (dreamDropdown) dreamDropdown.classList.remove('show');
+  if (extendedMenu) extendedMenu.classList.remove('show');
+  if (arrowIcon) arrowIcon.classList.remove('open');
 });
-dreamDropdown.addEventListener('click', e => e.stopPropagation());
-extendedMenu.addEventListener('click', e => e.stopPropagation());
+
+// 4. 阻止点击菜单内部时误触关闭
+if (dreamDropdown) {
+  dreamDropdown.onclick = function(e) { if (e) e.stopPropagation(); };
+}
+if (extendedMenu) {
+  extendedMenu.onclick = function(e) { if (e) e.stopPropagation(); };
+}
 
 // ================= 页面路由 =================
 function navigateTo(pageId) {
@@ -340,9 +360,12 @@ function renderChatMessages() {
   const hasCustomCSS = bSet.globalChatCSS && bSet.globalChatCSS.trim().length > 0;
   const subColor = bSet.globalSubTextColor || '#b0b0b0';
 
-  let bubbleClass = '';
-  if (bSet.globalBubbleStyle === 'glass') bubbleClass = 'bubble-glass';
-  if (bSet.globalBubbleStyle === 'handdrawn') bubbleClass = 'bubble-handdrawn';
+    let bubbleClass = '';
+  // 只有当没有自定义 CSS 时，才加载默认的玻璃/手绘风格，防止覆盖你的代码
+  if (!hasCustomCSS) {
+    if (bSet.globalBubbleStyle === 'glass') bubbleClass = 'bubble-glass';
+    if (bSet.globalBubbleStyle === 'handdrawn') bubbleClass = 'bubble-handdrawn';
+  }
 
   container.innerHTML = msgs.map((m, i) => {
     if (m.from === 'system') return `<div data-msg-index="${i}" style="text-align:center; margin:12px 0; font-size:12px; color:${subColor};">${m.text}</div>`;
@@ -440,7 +463,7 @@ function renderChatMessages() {
     }
 
     const sideClass = isUser ? 'bubble-user' : 'bubble-dream';
-    let bubbleStyle = 'padding: 10px 14px; font-size: 14px; line-height: 1.4; display: inline-block; text-align: left; max-width: 100%; box-sizing: border-box; word-break: break-word;';
+    let bubbleStyle = 'padding: 10px 14px; line-height: 1.4; display: inline-block; text-align: left; max-width: 100%; box-sizing: border-box; word-break: break-word;';
     
     if (isSticker) {
       bubbleStyle = 'padding: 0; background: transparent;';
@@ -3046,8 +3069,21 @@ function applyBeautifySettings() {
   if (!state.settings) return;
   
     // 1. 全局字体大小（安全版）
-  const size = state.settings.fontSize || 14;
+    const size = state.settings.fontSize || 14;
   document.body.style.fontSize = size + 'px'; 
+
+  // 👇 新增：强制覆盖所有元素的字体大小
+  let fontStyle = document.getElementById('globalFontStyle');
+  if (!fontStyle) {
+    fontStyle = document.createElement('style');
+    fontStyle.id = 'globalFontStyle';
+    document.head.appendChild(fontStyle);
+  }
+  fontStyle.innerHTML = `
+    body, .chat-bubble, input, textarea, .page-header h2, .avatar-name, #chatMessageContainer span, #chatMessageContainer div { 
+      font-size: ${size}px !important; 
+    }
+  `;
 
   // 2. 聊天背景壁纸
   const chatPage = document.getElementById('pageChat');
