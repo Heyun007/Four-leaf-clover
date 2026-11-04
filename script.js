@@ -1145,19 +1145,18 @@ function sendStickerToChat(stickerData) {
   triggerDreamReply();
 }
 
-// ================= 全新连发回复引擎 =================
-window._replyTimers = []; // 存放所有定时器，方便打断
+// ================= 全新连发回复引擎（修复版） =================
+window._replyTimers = [];
 let isDreamReplying = false;
 
 function triggerDreamReply() {
   if (!state.currentChatId) return;
 
+  // 1. 打断上一次的回复流程
   if (isDreamReplying) {
     window._replyTimers.forEach(clearTimeout);
     window._replyTimers = [];
     isDreamReplying = false;
-    const typingEl = document.getElementById('typingIndicator');
-    if (typingEl) typingEl.style.display = 'none';
   }
 
   isDreamReplying = true;
@@ -1169,47 +1168,74 @@ function triggerDreamReply() {
   const dream = state.dreams.find(x => x.id === chatIdAtSend);
   const dreamName = dream ? dream.name : '梦';
 
+  // 2. 把用户消息标记为已读
   const msgs = state.chatSessions[chatIdAtSend] || [];
   let hasUnread = false;
   msgs.forEach(m => { if (m.from === 'user' && m.status === 'unread') { m.status = 'read'; hasUnread = true; } });
   if (hasUnread) { saveState(); renderChatMessages(); }
 
+  // 3. 真正读取「已读不回」开关（这是原来漏掉的核心）
+  const cs = (state.chatSettingsMap || {})[chatIdAtSend] || {};
+  const readNoReply = !!cs.readNoReply;
+
+  // 如果开了已读不回，30% 概率：装模作样打两秒字，然后彻底不回
+  if (readNoReply && Math.random() < 0.3) {
+    if (typingNameEl) typingNameEl.textContent = dreamName;
+    if (typingEl) typingEl.style.display = 'flex';
+    const fakeTyping = setTimeout(() => {
+      if (typingEl) typingEl.style.display = 'none';
+      isDreamReplying = false;
+    }, 1800 + Math.random() * 1800);
+    window._replyTimers.push(fakeTyping);
+    return;
+  }
+
   const minS = s.replyMinSec != null ? s.replyMinSec : 3;
   const maxS = s.replyMaxSec != null ? s.replyMaxSec : 7;
-  const replyCount = 1 + Math.floor(Math.random() * 3);
+
+  // 4. 回复条数更自然：60% 一条 / 30% 两条 / 10% 三条
+  const rnd = Math.random();
+  const replyCount = rnd < 0.6 ? 1 : (rnd < 0.9 ? 2 : 3);
 
   function sendNextMessage(index) {
-    if (state.currentChatId !== chatIdAtSend) {
+    // 中途被打断就退出
+    if (state.currentChatId !== chatIdAtSend || !isDreamReplying) {
       isDreamReplying = false;
+      if (typingEl) typingEl.style.display = 'none';
       return;
     }
 
+    // 显示"正在输入"
     if (typingNameEl) typingNameEl.textContent = dreamName;
     if (typingEl) typingEl.style.display = 'flex';
 
-    const typingTimer = setTimeout(() => {
+    // ★ 关键修改：动画持续时长 = 设置的回复延迟，一秒不差
+    const delayMs = (minS + Math.random() * (maxS - minS)) * 1000;
+
+    const waitTimer = setTimeout(() => {
+      if (state.currentChatId !== chatIdAtSend || !isDreamReplying) {
+        isDreamReplying = false;
+        if (typingEl) typingEl.style.display = 'none';
+        return;
+      }
+
+      // ★ 关键修改：同一帧内隐藏动画 + 发消息，动画消失 = 消息立刻出现
       if (typingEl) typingEl.style.display = 'none';
+      generateAndSendMessage(chatIdAtSend, index === 0);
 
-      const delayMs = (minS + Math.random() * (maxS - minS)) * 1000;
-      
-      const waitTimer = setTimeout(() => {
-        if (state.currentChatId !== chatIdAtSend) return;
-
-        generateAndSendMessage(chatIdAtSend, index === 0);
-
-        if (index + 1 < replyCount) {
-          const nextTimer = setTimeout(() => {
+      if (index + 1 < replyCount) {
+        // 下一条消息：略微停顿后继续显示输入动画
+        const nextTimer = setTimeout(() => {
+          if (state.currentChatId === chatIdAtSend && isDreamReplying) {
             sendNextMessage(index + 1);
-          }, 1000 + Math.random() * 1500);
-          window._replyTimers.push(nextTimer);
-        } else {
-          isDreamReplying = false;
-        }
-      }, delayMs);
-      window._replyTimers.push(waitTimer);
-    }, 1500); 
-    
-    window._replyTimers.push(typingTimer);
+          }
+        }, 500 + Math.random() * 900);
+        window._replyTimers.push(nextTimer);
+      } else {
+        isDreamReplying = false;
+      }
+    }, delayMs);
+    window._replyTimers.push(waitTimer);
   }
 
   sendNextMessage(0);
@@ -1237,7 +1263,7 @@ function generateAndSendMessage(chatId, isFirst) {
   const canSendCard = usableCards.length > 0;
 
   let sendType = 'text';
-  if (canSendSticker && canSendCard) sendType = Math.random() < 0.4 ? 'sticker' : 'text';
+  if (canSendSticker && canSendCard) sendType = Math.random() < 0.15 ? 'sticker' : 'text';
   else if (canSendSticker) sendType = 'sticker';
   else if (canSendCard) sendType = 'text';
 
@@ -1790,10 +1816,30 @@ function triggerIncomingCall() {
     dream = state.dreams[Math.floor(Math.random() * state.dreams.length)];
   }
 
-  callState = 'ringing'; // 响铃状态
+    callState = 'ringing'; // 响铃状态
   const overlay = document.getElementById('callOverlay');
   overlay.style.display = 'flex';
   document.getElementById('callMini').style.display = 'none';
+
+  // ===== 新增：来电系统通知 =====
+  if ("Notification" in window && Notification.permission === "granted") {
+    try {
+      const notif = new Notification('📞 ' + dream.name, {
+        body: '正在呼叫你…',
+        tag: 'incoming-call',        // 固定 tag，避免重复来电时堆叠多条
+        requireInteraction: true,    // 来电是重要事件，通知常驻，不自动 5 秒消失
+        silent: false
+      });
+      notif.onclick = function () {
+        window.focus();            // 点通知 → 把窗口拉到前台
+        expandCall();              // 如果还响铃/通话中，就展开通话界面
+        notif.close();
+      };
+      window._incomingCallNotif = notif;   // 存起来，方便后面关闭
+    } catch (e) {
+      console.log('来电通知失败', e);
+    }
+  }
 
   const avatar = dream.avatar || `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Ccircle cx='40' cy='40' r='40' fill='%23ffe0e8'/%3E%3Ctext x='40' y='44' text-anchor='middle' fill='%23d6336c' font-size='28'%3E💜%3C/text%3E%3C/svg%3E`;
   
@@ -1825,6 +1871,13 @@ function triggerIncomingCall() {
 
 function answerCall(dreamId) {
   if (incomingCallTimer) clearTimeout(incomingCallTimer);
+
+  // ===== 新增：接通后关闭来电通知 =====
+  if (window._incomingCallNotif) {
+    try { window._incomingCallNotif.close(); } catch (e) {}
+    window._incomingCallNotif = null;
+  }
+
   callState = 'connected';
   callStartTime = Date.now();
   
@@ -1865,6 +1918,12 @@ function writeCallSystemMsg(text) {
 }
 
 function endCallCore() {
+  // ===== 新增：关闭来电通知 =====
+  if (window._incomingCallNotif) {
+    try { window._incomingCallNotif.close(); } catch (e) {}
+    window._incomingCallNotif = null;
+  }
+
   document.getElementById('callOverlay').style.display = 'none';
   document.getElementById('callMini').style.display = 'none';
   if (callTimerInterval) { clearInterval(callTimerInterval); callTimerInterval = null; }
