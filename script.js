@@ -9,8 +9,9 @@ let state = {
   currentEditDreamId: null // 当前正在编辑的梦角ID
 };
 
-// 初始化 IndexedDB 存储（使用 localforage）
+// 初始化 IndexedDB 存储（大容量版）
 localforage.config({
+  // 优先使用 IndexedDB，如果失败再退回 localStorage
   driver: [localforage.INDEXEDDB, localforage.LOCALSTORAGE],
   name: 'MyNewApp'
 });
@@ -67,15 +68,24 @@ function saveState() {
     const dataStr = JSON.stringify(state);
     const sizeInMB = new TextEncoder().encode(dataStr).length / (1024 * 1024);
     
-    if (sizeInMB > 4.8) {
-      console.warn('⚠️ 数据大小: ' + sizeInMB.toFixed(2) + 'MB，接近 localStorage 5MB 上限');
-      showToast('⚠️ 数据过大（' + sizeInMB.toFixed(1) + 'MB），可能保存失败');
+    // 如果数据超过 4.8MB 且当前还在用 localStorage，只弹一次警告
+    if (sizeInMB > 4.8 && localforage.driver() === localforage.LOCALSTORAGE) {
+      if (!window._hasWarnedSize) {
+        showToast('⚠️ 数据达 ' + sizeInMB.toFixed(1) + 'MB，建议清理旧图片');
+        window._hasWarnedSize = true;
+        setTimeout(() => { window._hasWarnedSize = false; }, 30000); // 30秒内不再重复弹
+      }
     }
     
     return localforage.setItem('myAppState', JSON.parse(dataStr))
       .catch(err => {
         console.error('❌ saveState 失败:', err);
-        showToast('❌ 保存失败：存储空间不足（' + sizeInMB.toFixed(1) + 'MB）');
+        // 保存失败时只提示一次，防止疯狂刷屏
+        if (!window._hasWarnedError) {
+          showToast('❌ 保存失败：存储空间不足！');
+          window._hasWarnedError = true;
+          setTimeout(() => { window._hasWarnedError = false; }, 30000); 
+        }
       });
   } catch (err) {
     console.error('❌ saveState 异常:', err);
