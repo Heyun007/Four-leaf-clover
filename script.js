@@ -503,7 +503,8 @@ function renderChatMessages() {
     }
 
     if (!bubbleContent || (typeof bubbleContent === 'string' && bubbleContent.trim() === '')) {
-       // 如果是空气泡，直接跳过不渲染
+       return ''; // 👈 必须加上这句，直接跳过空气泡
+    }
 
     return `
       <div data-msg-index="${i}" style="display: flex; margin-bottom: 16px; justify-content: ${isUser ? 'flex-end' : 'flex-start'}; align-items: flex-start; gap: 10px; width: 100%;">
