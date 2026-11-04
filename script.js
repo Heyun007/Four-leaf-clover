@@ -620,9 +620,9 @@ function renderCards() {
       groupsHtml += '<span class="cat-toggle' + (collapsed ? ' collapsed' : '') + '" onclick="toggleCategory(\'' + cat.id + '\')" style="cursor:pointer; font-size:12px; padding:4px;">▼</span>'; 
       groupsHtml += '</div></div>';
 
-      // 👇👇👇 这就是我之前弄丢的两行代码！！！补上了字卡内容的渲染和闭合括号！
+      // 👇 这里就是上一次漏掉的！一定要有这行！
       groupsHtml += '<div class="category-body' + (collapsed ? ' hidden' : '') + '">' + cardsHtml + '</div></div>'; 
-    });
+    }); // 👈 这里的闭合括号也是上次漏掉的！！
 
     if (filteredCats.length === 0) {
       groupsHtml = '<div class="card-empty">还没有分类，请点击上方「+ 分类」</div>';
@@ -1234,7 +1234,7 @@ function triggerDreamReply() {
   }
   isDreamReplying = true;
 
-  // 👇 先定义所有变量，防止报错！
+  // 👇 核心修复：先把所有变量定义好，再去用！
   const s = state.settings || {};
   const typingEl = document.getElementById('typingIndicator');
   const typingNameEl = document.getElementById('typingName');
@@ -1243,7 +1243,7 @@ function triggerDreamReply() {
   const dreamName = dream ? dream.name : '梦';
   const msgs = state.chatSessions[chatIdAtSend] || [];
 
-  // 1. 梦角偷偷收藏消息
+  // 1. 偷偷收藏
   if (Math.random() < 0.15) {
     const userMsgs = msgs.filter(m => m.from === 'user' && (m.type === 'text' || m.type === 'sticker' || m.type === 'image'));
     if (userMsgs.length > 0) {
@@ -1260,7 +1260,6 @@ function triggerDreamReply() {
           time: Date.now()
         });
         saveState();
-        
         setTimeout(() => {
           if (state.currentChatId === chatIdAtSend) {
             msgs.push({ from: 'system', type: 'text', text: `「${dreamName}」悄悄收藏了你的消息`, time: Date.now() });
@@ -3350,24 +3349,40 @@ function restoreData(e) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = ev => {
-    let parsedData;
+    let data;
     try {
-      parsedData = JSON.parse(ev.target.result);
+      data = JSON.parse(ev.target.result);
     } catch(err) {
-      showToast('文件格式错误');
+      showToast('文件格式错误，解析失败');
       e.target.value = '';
       return;
     }
     
-    state = parsedData;
+    // 深度合并数据，防止备份文件缺失字段导致报错
+    if (data) {
+      Object.keys(data).forEach(key => {
+        state[key] = data[key];
+      });
+    }
     
-    // 补全缺失数据
-    if (!state.profile) state.profile = { name: '我', avatar: '' };
-    if (!state.dreams) state.dreams = [];
-    if (!state.chatSessions) state.chatSessions = {};
-    if (!state.categories) state.categories = [{ id: 'default', name: '默认' }];
-    if (!state.stickerGroups) state.stickerGroups = [];
+    // 👇 强行清理可能存在的脏数据（null 等），防止导入后网页崩溃
+    if (!state.profile) state.profile = { name: '我', avatar: '', status: '在线' };
+    if (!Array.isArray(state.dreams)) state.dreams = [];
+    if (!Array.isArray(state.cards)) state.cards = [];
+    if (!Array.isArray(state.categories)) state.categories = [{ id: 'default', name: '默认' }];
+    if (!state.chatSessions || typeof state.chatSessions !== 'object') state.chatSessions = {};
+    if (!Array.isArray(state.stickerGroups)) state.stickerGroups = [];
+    if (!Array.isArray(state.mails)) state.mails = [];
+    if (!Array.isArray(state.diaries)) state.diaries = [];
+    if (!state.settings || typeof state.settings !== 'object') state.settings = {};
     
+    // 去除梦角里的 null
+    state.dreams = state.dreams.filter(d => d !== null && d !== undefined);
+    state.dreams.forEach(d => { 
+      if (!d.statuses || !Array.isArray(d.statuses)) d.statuses = []; 
+      if (!d.currentStatus) d.currentStatus = '在线'; 
+    });
+
     // 强行把当前聊天设回第一个梦角
     if (state.dreams.length > 0) {
       state.currentChatId = state.dreams[0].id;
@@ -3375,15 +3390,11 @@ function restoreData(e) {
     
     saveState();
     showToast('恢复成功，即将刷新');
-    
-    setTimeout(() => {
-      location.reload();
-    }, 800);
+    setTimeout(() => location.reload(), 800);
   };
   reader.readAsText(file);
   e.target.value = '';
 }
-
 function clearAllData() {
   if (!confirm('确定要清除所有数据吗？不可撤销！')) return;
   localforage.clear().then(() => {
