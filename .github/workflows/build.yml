@@ -19,7 +19,6 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    # 核心：直接继承系统自带的安卓 SDK 环境，绝不自己安装任何组件！
     - name: Set up Android SDK ENV
       run: |
         echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
@@ -33,7 +32,6 @@ jobs:
         mkdir -p app/src/main/res/mipmap-hdpi
         mkdir -p app/src/main/res/layout
         
-        # 拷贝网页文件
         cp index.html app/src/main/assets/ || true
         cp style.css app/src/main/assets/ || true
         cp script.js app/src/main/assets/ || true
@@ -41,7 +39,6 @@ jobs:
         cp sw.js app/src/main/assets/ || true
         if [ -d "stickers" ]; then cp -r stickers app/src/main/assets/; fi
 
-        # 写入 MainActivity.java
         cat > app/src/main/java/com/clover/app/MainActivity.java << 'EOF'
         package com.clover.app;
         import android.os.Bundle;
@@ -75,7 +72,6 @@ jobs:
         }
         EOF
 
-        # 写入 activity_main.xml
         cat > app/src/main/res/layout/activity_main.xml << 'EOF'
         <?xml version="1.0" encoding="utf-8"?>
         <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -85,7 +81,6 @@ jobs:
         </androidx.constraintlayout.widget.ConstraintLayout>
         EOF
 
-        # 写入 AndroidManifest.xml
         cat > app/src/main/AndroidManifest.xml << 'EOF'
         <?xml version="1.0" encoding="utf-8"?>
         <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.clover.app">
@@ -102,10 +97,8 @@ jobs:
         </manifest>
         EOF
 
-        # 写入图标
         base64 -d <<< "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==" > app/src/main/res/mipmap-hdpi/ic_launcher.png
 
-        # 写入 Gradle 配置，将 SDK 版本升到 34 以求最稳
         cat > build.gradle << 'EOF'
         buildscript {
             repositories { google(); mavenCentral() }
@@ -147,13 +140,14 @@ jobs:
         android.useAndroidX=true
         android.nonTransitiveRClass=true
         EOF
-        
-        # 生成 wrapper
-        gradle wrapper
+
+    - name: Setup Gradle
+      uses: gradle/gradle-build-action@v3
+      with:
+        gradle-version: 8.5
 
     - name: Build APK
-      # 直接使用 wrapper 构建，避免版本环境错乱
-      run: ./gradlew assembleDebug
+      run: gradle assembleDebug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
