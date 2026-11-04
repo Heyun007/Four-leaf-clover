@@ -66,6 +66,8 @@ jobs:
                 WebSettings ws = webView.getSettings();
                 ws.setJavaScriptEnabled(true);
                 ws.setDomStorageEnabled(true);
+                ws.setDatabaseEnabled(true); // 👈 加上这行
+                ws.setDatabasePath(getApplicationContext().getDir("databases", android.content.Context.MODE_PRIVATE).getPath()); // 👈 加上这行
                 ws.setAllowFileAccess(true);
                 ws.setAllowContentAccess(true);
                 ws.setAllowFileAccessFromFileURLs(true);
