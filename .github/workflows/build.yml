@@ -39,6 +39,7 @@ jobs:
         cp sw.js app/src/main/assets/ || true
         if [ -d "stickers" ]; then cp -r stickers app/src/main/assets/; fi
 
+        # 写入 MainActivity.java，修复了文件选择器兼容性
         cat > app/src/main/java/com/clover/app/MainActivity.java << 'EOF'
         package com.clover.app;
         import android.app.Activity;
@@ -76,12 +77,17 @@ jobs:
                     public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
                         if (mUploadMessage != null) mUploadMessage.onReceiveValue(null);
                         mUploadMessage = filePathCallback;
-                        Intent intent = fileChooserParams.createIntent();
+                        
+                        // 👇 核心修复：不再调用系统的 createIntent，而是手动构建一个最通用的文件选择 Intent
+                        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+                        intent.addCategory(Intent.CATEGORY_OPENABLE);
+                        intent.setType("*/*"); // 允许选择任何文件，防止部分手机不支持特定类型
+                        
                         try {
                             startActivityForResult(intent, FILECHOOSER_RESULTCODE);
                         } catch (Exception e) {
                             mUploadMessage = null;
-                            Toast.makeText(MainActivity.this, "无法打开文件选择器", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(MainActivity.this, "系统不支持打开文件管理器", Toast.LENGTH_SHORT).show();
                             return false;
                         }
                         return true;
@@ -125,7 +131,7 @@ jobs:
                             FileOutputStream fos = new FileOutputStream(file);
                             fos.write(decodedBytes);
                             fos.close();
-                            runOnUiThread(() -> Toast.makeText(MainActivity.this, "备份成功！保存在手机内部存储: " + file.getAbsolutePath(), Toast.LENGTH_LONG).show());
+                            runOnUiThread(() -> Toast.makeText(MainActivity.this, "备份成功！保存在手机: " + file.getAbsolutePath(), Toast.LENGTH_LONG).show());
                         } catch (Exception e) {
                             runOnUiThread(() -> Toast.makeText(MainActivity.this, "备份失败", Toast.LENGTH_SHORT).show());
                         }
@@ -141,21 +147,8 @@ jobs:
                     if (null == mUploadMessage) return;
                     Uri[] results = null;
                     if (resultCode == Activity.RESULT_OK) {
-                        if (intent == null) {
-                            results = new Uri[]{Uri.parse("")};
-                        } else {
-                            String dataString = intent.getDataString();
-                            if (dataString != null) {
-                                results = new Uri[]{Uri.parse(dataString)};
-                            } else {
-                                if (intent.getClipData() != null) {
-                                    int count = intent.getClipData().getItemCount();
-                                    results = new Uri[count];
-                                    for (int i = 0; i < count; i++) {
-                                        results[i] = intent.getClipData().getItemAt(i).getUri();
-                                    }
-                                }
-                            }
+                        if (intent != null && intent.getDataString() != null) {
+                            results = new Uri[]{Uri.parse(intent.getDataString())};
                         }
                     }
                     mUploadMessage.onReceiveValue(results);
@@ -180,12 +173,14 @@ jobs:
         </androidx.constraintlayout.widget.ConstraintLayout>
         EOF
 
+        # 增加了读取存储权限，兼容老旧安卓版本
         cat > app/src/main/AndroidManifest.xml << 'EOF'
         <?xml version="1.0" encoding="utf-8"?>
         <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.clover.app">
             <uses-permission android:name="android.permission.INTERNET" />
             <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-            <application android:allowBackup="true" android:icon="@mipmap/ic_launcher" android:label="四叶草" android:supportsRtl="true" android:theme="@style/Theme.AppCompat.NoActionBar">
+            <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+            <application android:allowBackup="true" android:icon="@mipmap/ic_launcher" android:label="四叶草" android:supportsRtl="true" android:theme="@style/Theme.AppCompat.NoActionBar" android:requestLegacyExternalStorage="true">
                 <activity android:name=".MainActivity" android:exported="true" android:configChanges="orientation|screenSize|keyboardHidden">
                     <intent-filter>
                         <action android:name="android.intent.action.MAIN" />
@@ -196,7 +191,7 @@ jobs:
         </manifest>
         EOF
 
-               cp icon.png app/src/main/res/mipmap-hdpi/ic_launcher.png
+        if [ -f "icon.png" ]; then cp icon.png app/src/main/res/mipmap-hdpi/ic_launcher.png; else base64 -d <<< "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==" > app/src/main/res/mipmap-hdpi/ic_launcher.png; fi
 
         cat > build.gradle << 'EOF'
         buildscript {
