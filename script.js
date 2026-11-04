@@ -1226,7 +1226,6 @@ let isDreamReplying = false;
 function triggerDreamReply() {
   if (!state.currentChatId) return;
 
-  // 如果梦角正在回复，用户又发了消息 -> 打断之前的回复
   if (isDreamReplying) {
     window._replyTimers.forEach(clearTimeout);
     window._replyTimers = [];
@@ -1244,71 +1243,57 @@ function triggerDreamReply() {
   const dream = state.dreams.find(x => x.id === chatIdAtSend);
   const dreamName = dream ? dream.name : '梦';
 
-  // 1. 立刻把用户消息变成已读
   const msgs = state.chatSessions[chatIdAtSend] || [];
   let hasUnread = false;
   msgs.forEach(m => { if (m.from === 'user' && m.status === 'unread') { m.status = 'read'; hasUnread = true; } });
   if (hasUnread) { saveState(); renderChatMessages(); }
 
-  // 2. 读取用户设置的延迟（秒）
   const minS = s.replyMinSec != null ? s.replyMinSec : 3;
   const maxS = s.replyMaxSec != null ? s.replyMaxSec : 7;
-
-  // 3. 决定这次连发几条（1 到 3 条）
   const replyCount = 1 + Math.floor(Math.random() * 3);
 
-  // 4. 开始执行发送流程
   function sendNextMessage(index) {
     if (state.currentChatId !== chatIdAtSend) {
       isDreamReplying = false;
       return;
     }
 
-    // === 阶段 A：显示“正在输入...” ===
     if (typingNameEl) typingNameEl.textContent = dreamName;
     if (typingEl) typingEl.style.display = 'flex';
 
-    // === 阶段 B：1.5 秒后，隐藏输入动画 ===
     const typingTimer = setTimeout(() => {
       if (typingEl) typingEl.style.display = 'none';
 
-      // === 阶段 C：等待用户设置的延迟时间 ===
       const delayMs = (minS + Math.random() * (maxS - minS)) * 1000;
       
       const waitTimer = setTimeout(() => {
         if (state.currentChatId !== chatIdAtSend) return;
 
-        // === 阶段 D：真正生成并发送这一条消息 ===
         generateAndSendMessage(chatIdAtSend, index === 0);
 
-        // 如果还有下一条，延迟一下继续发
         if (index + 1 < replyCount) {
           const nextTimer = setTimeout(() => {
             sendNextMessage(index + 1);
-          }, 1000 + Math.random() * 1500); // 两条消息之间隔 1-2.5 秒
+          }, 1000 + Math.random() * 1500);
           window._replyTimers.push(nextTimer);
         } else {
-          // 全部发完，解锁
           isDreamReplying = false;
         }
       }, delayMs);
       window._replyTimers.push(waitTimer);
-    }, 1500); // 动画固定显示 1.5 秒
+    }, 1500); 
     
     window._replyTimers.push(typingTimer);
   }
 
-  // 启动第一条
   sendNextMessage(0);
 }
 
-// ================= 单条消息生成器 =================
 function generateAndSendMessage(chatId, isFirst) {
   const s = state.settings || {};
   const msgs = state.chatSessions[chatId] || [];
   const userMsgs = msgs.filter(m => m.from === 'user').slice(-5);
 
-  // 过滤脏数据（防空气泡）
   const usableCards = state.cards.filter(c => 
     (c.dreamId || 'all') === 'all' || c.dreamId === chatId
   ).filter(c => {
@@ -1348,21 +1333,18 @@ function generateAndSendMessage(chatId, isFirst) {
       newMsg.text = canSendCard ? usableCards[Math.floor(Math.random() * usableCards.length)].text : '……';
     }
 
-    // 断句
     if (s.cutEnabled !== false && newMsg.text.length > 1 && Math.random() < 0.5) {
       const cutIndex = Math.floor(newMsg.text.length * (0.4 + Math.random() * 0.2));
       if (Math.random() < 0.5) { newMsg.text = newMsg.text.slice(0, cutIndex).trim(); newMsg.cut = 'end'; } 
       else { newMsg.text = newMsg.text.slice(cutIndex).trim(); newMsg.cut = 'start'; }
     }
 
-    // 情绪
     if (s.emotionEnabled !== false) {
       const emotions = ['开心', '激动', '伤心', '平静', '害羞', '期待', '疲惫', '温柔', '傲娇', '疑惑', '无奈'];
       newMsg.emotion = emotions[Math.floor(Math.random() * emotions.length)];
     }
   }
 
-  // 只有第一条消息有概率触发引用
   if (isFirst && s.dreamQuoteEnabled !== false && userMsgs.length > 0 && Math.random() < 0.15) {
     const picked = userMsgs[Math.floor(Math.random() * userMsgs.length)];
     newMsg.quote = { text: picked.type === 'text' ? picked.text : '[图片/表情]', senderName: state.profile.name || '我', msgId: -1 };
@@ -1381,6 +1363,7 @@ function generateAndSendMessage(chatId, isFirst) {
     }
   }
 }
+
 // ================= 拍一拍功能 =================
 // 初始化词条（如果没数据的话）
 if (!state.pokes) {
