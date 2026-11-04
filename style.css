@@ -8,7 +8,11 @@ body { background: #e5e5ea; display: flex; justify-content: center; align-items:
 @media (max-width: 450px) { .phone-container { width: 100vw; height: 100vh; border-radius: 0; } }
 
 /* ================= 顶部导航栏 ================= */
-.top-bar { height: 60px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(0,0,0,0.05); z-index: 100; flex-shrink: 0; }
+.top-bar { 
+    height: 60px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; 
+    background: rgba(255, 255, 255, 0.95); /* 把模糊改成直接透明度 */
+    border-bottom: 1px solid rgba(0,0,0,0.05); z-index: 1000; flex-shrink: 0; 
+}
 .nav-left { display: flex; align-items: center; gap: 4px; }
 .avatar-item { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
 .avatar-circle { width: 28px; height: 28px; border-radius: 50%; background: #e1ebf5; display: flex; justify-content: center; align-items: center; font-size: 12px; color: var(--blue); border: 1px solid #ccc; background-size: cover; background-position: center; }
