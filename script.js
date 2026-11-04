@@ -1397,7 +1397,7 @@ function generateAndSendMessage(chatId, isFirst) {
     if (!c.text || typeof c.text !== 'string') return false;
     const trimmed = c.text.trim();
     if (trimmed.length === 0) return false;
-        if (/[\u200B-\u200D\uFEFF\uFFFD\u25A0\u25A1\uFFFC]/.test(trimmed)) return false;
+    if (/[\u200B-\u200D\uFEFF\uFFFD\u25A0\u25A1\uFFFC]/.test(trimmed)) return false;
     return true;
   });
 
@@ -1407,15 +1407,13 @@ function generateAndSendMessage(chatId, isFirst) {
   const canSendSticker = allStickers.length > 0;
   const canSendCard = usableCards.length > 0;
 
-  // 👇 终极无预设版：先检查你配了没有，没配就绝对不发！
   let sendType = 'text';
   const userGifts = getGiftItems();
-  const hasGifts = userGifts && userGifts.length > 0; // 检查你有没有加礼物
-  const hasCards = usableCards.length > 0; // 检查你有没有字卡
+  const hasGifts = userGifts && userGifts.length > 0; 
+  const hasCards = usableCards.length > 0;
 
   const rollSpecial = Math.random();
   
-  // 只有你配了字卡，梦角才会发红包；只有你配了礼物，梦角才会送礼！
   if (rollSpecial < 0.08 && hasCards) {
     sendType = 'dream_redpacket'; 
   } else if (rollSpecial < 0.13 && hasGifts) {
@@ -1430,7 +1428,6 @@ function generateAndSendMessage(chatId, isFirst) {
 
   let newMsg = { from: 'dream', time: Date.now() };
 
-  // 处理梦角发红包/礼物（没有任何预设的鬼东西！）
   if (sendType === 'dream_redpacket') {
     newMsg.type = sendType;
     newMsg.packetId = 'pkt_' + Date.now() + Math.floor(Math.random()*1000);
@@ -1438,7 +1435,6 @@ function generateAndSendMessage(chatId, isFirst) {
     
     const amounts = [5.20, 13.14, 52.0, 6.66, 8.88, 99.99];
     newMsg.amount = amounts[Math.floor(Math.random() * amounts.length)];
-    // 直接抽你字卡库里的话
     newMsg.message = usableCards[Math.floor(Math.random() * usableCards.length)].text; 
     
   } else if (sendType === 'dream_gift') {
@@ -1446,7 +1442,6 @@ function generateAndSendMessage(chatId, isFirst) {
     newMsg.packetId = 'pkt_' + Date.now() + Math.floor(Math.random()*1000);
     newMsg.claimed = false;
     
-    // 直接抽你礼物列表里的名字和价格
     const pickedGift = userGifts[Math.floor(Math.random() * userGifts.length)];
     newMsg.giftName = pickedGift.name;
     newMsg.amount = pickedGift.price;
@@ -1457,59 +1452,13 @@ function generateAndSendMessage(chatId, isFirst) {
     newMsg.type = 'poke';
     newMsg.text = pokeText;
     newMsg.senderName = dream ? dream.name : '梦角';
+    
   } else if (sendType === 'sticker') {
     newMsg.type = 'sticker';
     newMsg.stickerData = allStickers[Math.floor(Math.random() * allStickers.length)];
-  } else {
-    newMsg.type = 'text';
-    if (canSendCard && s.cardJoinEnabled) {
-      const minN = Math.max(1, Math.min(7, s.cardJoinMin || 1));
-      const maxN = Math.max(minN, Math.min(7, s.cardJoinMax || 3));
-      let count = minN + Math.floor(Math.random() * (maxN - minN + 1));
-      let shuffled = [...usableCards].sort(() => Math.random() - 0.5);
-      let picked = shuffled.slice(0, Math.min(count, shuffled.length));
-      newMsg.text = picked.map(c => c.text).join('，');
-    } else {
-      newMsg.text = canSendCard ? usableCards[Math.floor(Math.random() * usableCards.length)].text : '……';
-    }
     
-    // （这里保留你原本的断句、情绪等逻辑，不用动）
-
-    // 处理梦角发红包/礼物
-    if (sendType === 'dream_redpacket' || sendType === 'dream_gift') {
-      newMsg.type = sendType;
-      newMsg.packetId = 'pkt_' + Date.now() + Math.floor(Math.random()*1000);
-      newMsg.claimed = false;
-      
-      if (sendType === 'dream_redpacket') {
-        const amounts = [5.20, 13.14, 52.0, 6.66, 8.88, 99.99];
-        newMsg.amount = amounts[Math.floor(Math.random() * amounts.length)];
-        // 👇 从你的字卡库里抽一句
-        newMsg.message = usableCards.length > 0 ? usableCards[Math.floor(Math.random() * usableCards.length)].text : "大吉大利";
-      } else {
-        // 👇 从你自己添加的礼物列表抽
-        const userGifts = getGiftItems();
-        if (userGifts && userGifts.length > 0) {
-          const pickedGift = userGifts[Math.floor(Math.random() * userGifts.length)];
-          newMsg.giftName = pickedGift.name;
-          newMsg.amount = pickedGift.price;
-        } else {
-          newMsg.giftName = "神秘礼物";
-          newMsg.amount = 5;
-        }
-      }
-    }
-  } else if (sendType === 'poke') {
-    const dream = state.dreams.find(x => x.id === chatId);
-    const pokeText = state.pokes[Math.floor(Math.random() * state.pokes.length)];
-    newMsg.type = 'poke';
-    newMsg.text = pokeText;
-    newMsg.senderName = dream ? dream.name : '梦角';
-  } else if (sendType === 'sticker') {
-    
-    newMsg.type = 'sticker';
-    newMsg.stickerData = allStickers[Math.floor(Math.random() * allStickers.length)];
   } else {
+    // 纯文字聊天
     newMsg.type = 'text';
     if (canSendCard && s.cardJoinEnabled) {
       const minN = Math.max(1, Math.min(7, s.cardJoinMin || 1));
@@ -1522,33 +1471,30 @@ function generateAndSendMessage(chatId, isFirst) {
       newMsg.text = canSendCard ? usableCards[Math.floor(Math.random() * usableCards.length)].text : '……';
     }
 
-    // 安全断句：防止切碎 Emoji 产生黑方块，同时防止切出空气泡
+    // 断句逻辑
     if (s.cutEnabled !== false && newMsg.text.length > 1 && Math.random() < 0.5) {
-      // 使用 Array.from 把字符串转换为真正的字符数组，这样“😀”只会被当成 1 个字符
       const chars = Array.from(newMsg.text);
-      
       if (chars.length > 1) {
         const cutIndex = Math.floor(chars.length * (0.4 + Math.random() * 0.2));
         const isCutEnd = Math.random() < 0.5;
-        
-        // 尝试截断
         let cutText = isCutEnd ? chars.slice(0, cutIndex).join('') : chars.slice(cutIndex).join('');
         cutText = cutText.trim();
-        
-        // 关键：如果截断后变空了（比如全是空格、标点被切走了），就不应用断句，保留原句
         if (cutText.length > 0 && /[^\s\p{P}]/u.test(cutText)) {
           newMsg.text = cutText;
           newMsg.cut = isCutEnd ? 'end' : 'start';
         }
       }
     }
+
+    // 情绪标签
     if (s.emotionEnabled !== false) {
       const emotions = ['开心', '激动', '伤心', '平静', '害羞', '期待', '疲惫', '温柔', '傲娇', '疑惑', '无奈'];
       newMsg.emotion = emotions[Math.floor(Math.random() * emotions.length)];
     }
   }
 
-    if (isFirst && s.dreamQuoteEnabled !== false && userMsgs.length > 0 && Math.random() < 0.15) {
+  // 引用逻辑
+  if (isFirst && s.dreamQuoteEnabled !== false && userMsgs.length > 0 && Math.random() < 0.15) {
     const picked = userMsgs[Math.floor(Math.random() * userMsgs.length)];
     newMsg.quote = { text: picked.type === 'text' ? picked.text : '[图片/表情]', senderName: state.profile.name || '我', msgId: -1, type: picked.type };
     if (picked.type === 'sticker') newMsg.quote.stickerData = picked.stickerData;
@@ -1564,11 +1510,10 @@ function generateAndSendMessage(chatId, isFirst) {
 
   if (s.pushEnabled && Notification.permission === 'granted') {
     if (!document.hasFocus() || state.currentChatId !== chatId) {
-      new Notification(dreamName, { body: newMsg.type === 'text' ? newMsg.text : '[表情/图片]' });
+      new Notification(state.dreams.find(d=>d.id===chatId)?.name || '梦角', { body: newMsg.type === 'text' ? newMsg.text : '[消息]' });
     }
   }
 }
-
 // ================= 拍一拍功能 =================
 // 初始化词条（如果没数据的话）
 if (!state.pokes) {
