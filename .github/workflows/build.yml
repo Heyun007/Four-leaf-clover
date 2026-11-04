@@ -196,7 +196,7 @@ jobs:
         </manifest>
         EOF
 
-        base64 -d <<< "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==" > app/src/main/res/mipmap-hdpi/ic_launcher.png
+               cp icon.png app/src/main/res/mipmap-hdpi/ic_launcher.png
 
         cat > build.gradle << 'EOF'
         buildscript {
