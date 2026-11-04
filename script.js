@@ -2,7 +2,6 @@
 let state = {
   profile: { name: '我', avatar: '' },
   dreams: [], // 梦角数组
-  dreams: [], 
   cards: [],  // 字卡数组
   categories: [{ id: 'default', name: '默认' }],
   chatSessions: {}, // 聊天记录 { dreamId: [ {from, text, time} ] },
@@ -477,139 +476,6 @@ function sendChatMsg() {
   saveState();
   renderChatMessages();
   triggerDreamReply();
-}
-
-function triggerDreamReply() {
-  if (!state.currentChatId) return;
-
-  if (isDreamReplying) {
-    if (Date.now() - (window._lastReplyStartTime || 0) > 10000) {
-      isDreamReplying = false;
-    } else {
-      return; 
-    }
-  }
-  
-  isDreamReplying = true;
-  window._lastReplyStartTime = Date.now();
-
-  const s = state.settings || {};
-  const typingEl = document.getElementById('typingIndicator');
-  const typingNameEl = document.getElementById('typingName');
-  const chatIdAtSend = state.currentChatId;
-  const dream = state.dreams.find(x => x.id === chatIdAtSend);
-  const dreamName = dream ? dream.name : '梦';
-
-  const msgs = state.chatSessions[chatIdAtSend] || [];
-  let hasUnread = false;
-  msgs.forEach(m => { if (m.from === 'user' && m.status === 'unread') { m.status = 'read'; hasUnread = true; } });
-  if (hasUnread) { saveState(); renderChatMessages(); }
-
-  const minS = s.replyMinSec != null ? s.replyMinSec : 3;
-  const maxS = s.replyMaxSec != null ? s.replyMaxSec : 7;
-  const replyCount = 1 + Math.floor(Math.random() * 3);
-
-  function sendNextMessage(index) {
-    if (state.currentChatId !== chatIdAtSend) {
-      isDreamReplying = false;
-      return;
-    }
-
-    if (typingNameEl) typingNameEl.textContent = dreamName;
-    if (typingEl) typingEl.style.display = 'flex';
-
-    const typingTimer = setTimeout(() => {
-      if (typingEl) typingEl.style.display = 'none';
-      const delayMs = (minS + Math.random() * (maxS - minS)) * 1000;
-      
-      const waitTimer = setTimeout(() => {
-        if (state.currentChatId !== chatIdAtSend) return;
-        generateAndSendMessage(chatIdAtSend, index === 0);
-        if (index + 1 < replyCount) {
-          const nextTimer = setTimeout(() => { sendNextMessage(index + 1); }, 1000 + Math.random() * 1500);
-          window._replyTimers.push(nextTimer);
-        } else {
-          isDreamReplying = false;
-        }
-      }, delayMs);
-      window._replyTimers.push(waitTimer);
-    }, 1500); 
-    window._replyTimers.push(typingTimer);
-  }
-  sendNextMessage(0);
-}
-
-function generateAndSendMessage(chatId, isFirst) {
-  const s = state.settings || {};
-  const msgs = state.chatSessions[chatId] || [];
-  const userMsgs = msgs.filter(m => m.from === 'user').slice(-5);
-
-  const usableCards = state.cards.filter(c => (c.dreamId || 'all') === 'all' || c.dreamId === chatId).filter(c => {
-    if (!c.text || typeof c.text !== 'string') return false;
-    const trimmed = c.text.trim();
-    if (trimmed.length === 0) return false;
-    if (/[\u200B-\u200D\uFEFF\uFFFD\u25A0]/.test(trimmed)) return false;
-    return true;
-  });
-
-  let allStickers = [];
-  state.stickerGroups.forEach(g => { if (g.items) allStickers = allStickers.concat(g.items); });
-
-  const canSendSticker = allStickers.length > 0;
-  const canSendCard = usableCards.length > 0;
-
-  let sendType = 'text';
-  if (canSendSticker && canSendCard) sendType = Math.random() < 0.4 ? 'sticker' : 'text';
-  else if (canSendSticker) sendType = 'sticker';
-  else if (canSendCard) sendType = 'text';
-
-  let newMsg = { from: 'dream', time: Date.now() };
-
-  if (sendType === 'sticker') {
-    newMsg.type = 'sticker';
-    newMsg.stickerData = allStickers[Math.floor(Math.random() * allStickers.length)];
-  } else {
-    newMsg.type = 'text';
-    if (canSendCard && s.cardJoinEnabled) {
-      const minN = Math.max(1, Math.min(7, s.cardJoinMin || 1));
-      const maxN = Math.max(minN, Math.min(7, s.cardJoinMax || 3));
-      let count = minN + Math.floor(Math.random() * (maxN - minN + 1));
-      let shuffled = [...usableCards].sort(() => Math.random() - 0.5);
-      let picked = shuffled.slice(0, Math.min(count, shuffled.length));
-      newMsg.text = picked.map(c => c.text).join('，');
-    } else {
-      newMsg.text = canSendCard ? usableCards[Math.floor(Math.random() * usableCards.length)].text : '……';
-    }
-
-    if (s.cutEnabled !== false && newMsg.text.length > 1 && Math.random() < 0.5) {
-      const cutIndex = Math.floor(newMsg.text.length * (0.4 + Math.random() * 0.2));
-      if (Math.random() < 0.5) { newMsg.text = newMsg.text.slice(0, cutIndex).trim(); newMsg.cut = 'end'; } 
-      else { newMsg.text = newMsg.text.slice(cutIndex).trim(); newMsg.cut = 'start'; }
-    }
-
-    if (s.emotionEnabled !== false) {
-      const emotions = ['开心', '激动', '伤心', '平静', '害羞', '期待', '疲惫', '温柔', '傲娇', '疑惑', '无奈'];
-      newMsg.emotion = emotions[Math.floor(Math.random() * emotions.length)];
-    }
-  }
-
-  if (isFirst && s.dreamQuoteEnabled !== false && userMsgs.length > 0 && Math.random() < 0.15) {
-    const picked = userMsgs[Math.floor(Math.random() * userMsgs.length)];
-    newMsg.quote = { text: picked.type === 'text' ? picked.text : '[图片/表情]', senderName: state.profile.name || '我', msgId: -1 };
-  }
-
-  msgs.push(newMsg);
-  saveState();
-  
-  if (document.getElementById('pageChat').classList.contains('active') && state.currentChatId === chatId) {
-    renderChatMessages();
-  }
-
-  if (s.pushEnabled && Notification.permission === 'granted') {
-    if (!document.hasFocus() || state.currentChatId !== chatId) {
-      new Notification(state.dreams.find(x=>x.id===chatId).name, { body: newMsg.type === 'text' ? newMsg.text : '[表情/图片]' });
-    }
-  }
 }
 
 // ================= 4. 完整版字卡功能 =================
@@ -4582,21 +4448,6 @@ function confirmSpectateMatch() {
   createGomokuAiMatch(d1, d2, null);
 }
 
-function createGomokuAiMatch(d1, d2, triggerChatId) {
-  var matchId = 'aimatch_' + Date.now();
-  var match = {
-    id: matchId, p1Id: d1.id, p1Name: d1.name, p1Color: Math.random() < 0.5 ? 1 : 2,
-    p2Id: d2.id, p2Name: d2.name, p2Color: 0,
-    board: Array(15).fill(0).map(() => Array(15).fill(0)),
-    moves: [], active: true, startTime: Date.now(),
-    triggerChatId: triggerChatId, turnColor: 1, p1UndoLeft: 3, p2UndoLeft: 3
-  };
-  match.p2Color = match.p1Color === 1 ? 2 : 1;
-  state.gomokuAiMatches.push(match); saveState();
-  if (!triggerChatId) enterSpectateMode(matchId);
-  runAiMatchEngine(matchId);
-}
-
 function enterSpectateMode(matchId) {
   var match = state.gomokuAiMatches.find(m => m.id === matchId);
   if (!match) return showToast('对局已结束或不存在');
@@ -4624,38 +4475,6 @@ function enterSpectateMode(matchId) {
         runAiMatchEngine(matchId);
       }
     }, 1000);
-  }
-}
-
-function endGomokuAiMatch(match, winnerId) {
-  match.active = false; match.endTime = Date.now(); match.winner = winnerId;
-  match.duration = Math.floor((match.endTime - match.startTime) / 1000); saveState();
-  var winnerName = winnerId === 'draw' ? '平局' : (winnerId === match.p1Id ? match.p1Name : match.p2Name);
-  
-  if (!state.gomokuHistory) state.gomokuHistory = [];
-  
-  state.gomokuHistory.push({
-    id: match.id, 
-    startTime: match.startTime, 
-    endTime: match.endTime, 
-    duration: match.duration,
-    dreamName: match.p1Name + ' vs ' + match.p2Name, 
-    userColor: 0, // 0 代表这是梦角对局
-    winner: winnerId === 'draw' ? 'draw' : 'ai', 
-    winnerName: winnerName, 
-    reason: 'five',
-    p1Name: match.p1Name,
-    p2Name: match.p2Name,
-    p1Color: match.p1Color,
-    p2Color: match.p2Color
-  });
-  
-  saveState();
-  if (gomoku.mode === 'spectate' && gomoku.spectateMatchId === match.id) { 
-    gomoku.board = match.board; 
-    drawGomokuBoard(); 
-    updateGomokuUI(); 
-    showToast('对局结束：' + winnerName + ' 获胜'); 
   }
 }
 
