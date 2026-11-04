@@ -380,6 +380,31 @@ function renderChatMessages() {
     const isUser = m.from === 'user';
     const avatar = isUser ? userAvatar : dreamAvatar;
     const isSticker = m.type === 'sticker';
+    
+    // 👇 新增：渲染梦角发的红包和礼物卡片
+    if (m.type === 'dream_redpacket' || m.type === 'dream_gift') {
+      const isRp = m.type === 'dream_redpacket';
+      const cardBg = isRp ? 'linear-gradient(135deg, #ff8c8c, #fa5151)' : 'linear-gradient(135deg, #f5f5f7, #e8e8ed)';
+      const icon = isRp ? '🧧' : '🎁';
+      const title = isRp ? m.message : `送了你「${m.giftName}」`;
+      const statusText = m.claimed ? '已领取' : '点击领取';
+      const textColor = isRp ? '#fff' : '#333';
+
+      return `<div data-msg-index="${i}" style="display:flex;justify-content:flex-start;margin-bottom:12px; width:100%;">
+        <img src="${avatar}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin-right: 10px;">
+        <div onclick="claimDreamPacket('${m.packetId}', ${i})" style="width:220px;background:${cardBg};border-radius:12px;padding:16px;cursor:${m.claimed ? 'default' : 'pointer'}; box-shadow:0 4px 14px rgba(0,0,0,0.08);">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+            <span style="font-size:24px;">${icon}</span>
+            <span style="font-size:14px;font-weight:600;color:${textColor}; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${title}</span>
+          </div>
+          <div style="font-size:12px;color:${isRp ? 'rgba(255,255,255,0.8)' : '#86868b'}; border-top:1px solid ${isRp ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.05)'}; padding-top:8px; display:flex; justify-content:space-between; align-items:center;">
+            <span>${isRp ? '红包' : '礼物'}</span>
+            <span>${statusText}</span>
+          </div>
+        </div>
+      </div>`;
+    }
+    
     const date = new Date(m.time || Date.now());
     const timeStr = String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0');
     
@@ -427,9 +452,20 @@ function renderChatMessages() {
       if (!isUser) bubbleStyle += `box-shadow: 0 1px 3px rgba(0,0,0,0.05);`;
     }
 
-    let quoteHtml = '';
+        let quoteHtml = '';
     if (m.quote) {
-      quoteHtml = `<div style="font-size: 12px; padding: 6px 8px; margin-bottom: 8px; background: rgba(255,255,255,0.6); color: #333; border-left: 3px solid #007aff; border-radius: 4px; word-break: break-all; text-align: left; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">${m.quote.senderName || ''}：${m.quote.text || ''}</div>`;
+      let quoteContent = `<span style="color:#666;">${m.quote.senderName || ''}：</span>`;
+      
+      // 👇 新增：根据类型判断是显示文字还是图片
+      if (m.quote.type === 'sticker' && m.quote.stickerData) {
+        quoteContent += `<img src="${m.quote.stickerData}" style="max-width: 40px; max-height: 40px; vertical-align: middle; border-radius: 4px; margin-left: 4px;">`;
+      } else if (m.quote.type === 'image' && m.quote.imageData) {
+        quoteContent += `<img src="${m.quote.imageData}" style="max-width: 40px; max-height: 40px; vertical-align: middle; border-radius: 4px; margin-left: 4px;">`;
+      } else {
+        quoteContent += `<span style="color:#333;">${m.quote.text || ''}</span>`;
+      }
+
+      quoteHtml = `<div style="font-size: 12px; padding: 6px 8px; margin-bottom: 8px; background: rgba(255,255,255,0.6); border-left: 3px solid #007aff; border-radius: 4px; word-break: break-all; text-align: left; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; align-items: center;">${quoteContent}</div>`;
     }
 
     // 👇 加上这个大括号闭合，之前就是这里没闭合导致整个 JS 瘫痪
@@ -1164,6 +1200,45 @@ function triggerDreamReply() {
 
   isDreamReplying = true;
 
+    // 👇 新增：梦角有 15% 的概率偷偷收藏你刚刚发的消息
+  if (Math.random() < 0.15) {
+    // 找出你最近发的一条文本、图片或表情包
+    const userMsgs = msgs.filter(m => m.from === 'user' && (m.type === 'text' || m.type === 'sticker' || m.type === 'image'));
+    
+    if (userMsgs.length > 0) {
+      const targetMsg = userMsgs[userMsgs.length - 1];
+      if (!state.favorites) state.favorites = [];
+      
+      // 防止重复收藏一样的消息
+      const isExist = state.favorites.some(f => f.text === targetMsg.text && f.favBy === dreamName);
+      
+      if (!isExist) {
+        state.favorites.push({
+          id: 'fav_' + Date.now(),
+          text: targetMsg.type === 'text' ? targetMsg.text : (targetMsg.type === 'sticker' ? '[表情]' : '[图片]'),
+          senderName: state.profile.name || '我',
+          favBy: dreamName, // 标记是梦角收藏的
+          time: Date.now()
+        });
+        saveState();
+        
+        // 过几秒钟，在聊天框里弹出一句小字提示你
+        setTimeout(() => {
+          if (state.currentChatId === chatIdAtSend) {
+            msgs.push({ 
+              from: 'system', 
+              type: 'text', 
+              text: `「${dreamName}」悄悄收藏了你的消息`, 
+              time: Date.now() 
+            });
+            saveState();
+            renderChatMessages();
+          }
+        }, 3000 + Math.random() * 2000); // 3~5秒后提示
+      }
+    }
+  }
+
   const s = state.settings || {};
   const typingEl = document.getElementById('typingIndicator');
   const typingNameEl = document.getElementById('typingName');
@@ -1181,8 +1256,8 @@ function triggerDreamReply() {
   const cs = (state.chatSettingsMap || {})[chatIdAtSend] || {};
   const readNoReply = !!cs.readNoReply;
 
-  // 如果开了已读不回，30% 概率：装模作样打两秒字，然后彻底不回
-  if (readNoReply && Math.random() < 0.3) {
+  // 如果开了已读不回，10% 概率：装模作样打两秒字，然后彻底不回
+  if (readNoReply && Math.random() < 0.1) {
     if (typingNameEl) typingNameEl.textContent = dreamName;
     if (typingEl) typingEl.style.display = 'flex';
     const fakeTyping = setTimeout(() => {
@@ -1266,13 +1341,43 @@ function generateAndSendMessage(chatId, isFirst) {
   const canSendCard = usableCards.length > 0;
 
   let sendType = 'text';
-  if (canSendSticker && canSendCard) sendType = Math.random() < 0.15 ? 'sticker' : 'text';
-  else if (canSendSticker) sendType = 'sticker';
-  else if (canSendCard) sendType = 'text';
+  // 梦角发特殊卡片的判定
+  const rollSpecial = Math.random();
+  if (rollSpecial < 0.08) {
+    sendType = 'dream_redpacket'; // 8% 概率发红包
+  } else if (rollSpecial < 0.13) {
+    sendType = 'dream_gift';      // 5% 概率送礼物
+  } else if (state.pokes && state.pokes.length > 0 && Math.random() < 0.1) {
+    sendType = 'poke';
+  } else {
+    if (canSendSticker && canSendCard) sendType = Math.random() < 0.2 ? 'sticker' : 'text';
+    else if (canSendSticker) sendType = 'sticker';
+    else if (canSendCard) sendType = 'text';
+  }
 
   let newMsg = { from: 'dream', time: Date.now() };
 
-  if (sendType === 'sticker') {
+  // 处理梦角发红包/礼物
+  if (sendType === 'dream_redpacket' || sendType === 'dream_gift') {
+    newMsg.type = sendType;
+    newMsg.packetId = 'pkt_' + Date.now() + Math.floor(Math.random()*1000);
+    newMsg.claimed = false; // 初始状态为未领取
+    if (sendType === 'dream_redpacket') {
+      const amounts = [5.20, 13.14, 52.0, 6.66, 8.88, 99.99];
+      newMsg.amount = amounts[Math.floor(Math.random() * amounts.length)];
+      newMsg.message = ["拿去喝奶茶~", "请你吃糖！", "收下吧！", "一点小心意"][Math.floor(Math.random() * 4)];
+    } else {
+      const gifts = ["一束玫瑰", "一杯奶茶", "一个盲盒", "一只小猫", "一个拥抱"];
+      newMsg.giftName = gifts[Math.floor(Math.random() * gifts.length)];
+    }
+  } else if (sendType === 'poke') {
+    const dream = state.dreams.find(x => x.id === chatId);
+    const pokeText = state.pokes[Math.floor(Math.random() * state.pokes.length)];
+    newMsg.type = 'poke';
+    newMsg.text = pokeText;
+    newMsg.senderName = dream ? dream.name : '梦角';
+  } else if (sendType === 'sticker') {
+    
     newMsg.type = 'sticker';
     newMsg.stickerData = allStickers[Math.floor(Math.random() * allStickers.length)];
   } else {
@@ -1314,9 +1419,11 @@ function generateAndSendMessage(chatId, isFirst) {
     }
   }
 
-  if (isFirst && s.dreamQuoteEnabled !== false && userMsgs.length > 0 && Math.random() < 0.15) {
+    if (isFirst && s.dreamQuoteEnabled !== false && userMsgs.length > 0 && Math.random() < 0.15) {
     const picked = userMsgs[Math.floor(Math.random() * userMsgs.length)];
-    newMsg.quote = { text: picked.type === 'text' ? picked.text : '[图片/表情]', senderName: state.profile.name || '我', msgId: -1 };
+    newMsg.quote = { text: picked.type === 'text' ? picked.text : '[图片/表情]', senderName: state.profile.name || '我', msgId: -1, type: picked.type };
+    if (picked.type === 'sticker') newMsg.quote.stickerData = picked.stickerData;
+    if (picked.type === 'image') newMsg.quote.imageData = picked.imageData;
   }
 
   msgs.push(newMsg);
@@ -1608,13 +1715,13 @@ function renderStatusPanel(dream, result, isCooldown) {
   html += '</div>';
 
   html += '<div style="margin-bottom:14px;">';
-  html += '<div style="font-size:12px;color:${subColor};margin-bottom:4px;">💗 心情值</div>';
+  html += '<div style="font-size:12px;color:#86868b;margin-bottom:4px;">💗 心情值</div>';
   html += `<div style="width:100%;height:10px;background:#f0f0f5;border-radius:5px;overflow:hidden;position:relative;"><div style="height:100%;width:${result.moodVal}%;background:linear-gradient(90deg,#ffb6c1,#ff6b9d);border-radius:5px;transition:width 0.6s;"></div></div>`;
   html += `<div style="font-size:12px;font-weight:600;color:#333;text-align:right;margin-top:4px;">${result.moodVal}%</div>`;
   html += '</div>';
 
   html += '<div style="margin-bottom:16px;">';
-  html += '<div style="font-size:12px;color:${subColor};margin-bottom:4px;">⚡ 能量值</div>';
+  html += '<div style="font-size:12px;color:#86868b;margin-bottom:4px;">⚡ 能量值</div>';
   html += `<div style="width:100%;height:10px;background:#f0f0f5;border-radius:5px;overflow:hidden;position:relative;"><div style="height:100%;width:${result.energyVal}%;background:linear-gradient(90deg,#a8e6cf,#34c759);border-radius:5px;transition:width 0.6s;"></div></div>`;
   html += `<div style="font-size:12px;font-weight:600;color:#333;text-align:right;margin-top:4px;">${result.energyVal}%</div>`;
   html += '</div>';
@@ -1622,7 +1729,7 @@ function renderStatusPanel(dream, result, isCooldown) {
   html += `<div style="background:#f8f8fa;border-radius:14px;padding:16px;text-align:center;margin-bottom:14px;">
     <div style="font-size:16px;font-weight:600;color:#1d1d1f;margin-bottom:4px;">${result.moodText}</div>
     <div style="font-size:11px;color:#bbb;margin-top:10px;">正在做什么</div>
-    <div style="font-size:13px;color:${subColor};margin-top:4px;line-height:1.5;">${result.doingText}</div>
+    <div style="font-size:13px;color:#86868b;margin-top:4px;line-height:1.5;">${result.doingText}</div>
   </div>`;
 
   if (isCooldown) {
@@ -2258,6 +2365,27 @@ function closeGiftDetail() {
   document.getElementById('giftDetail').style.display = 'none';
 }
 
+// 👇 新增：领取梦角发的红包/礼物
+function claimDreamPacket(packetId, msgIndex) {
+  if (!state.currentChatId) return;
+  const msgs = state.chatSessions[state.currentChatId] || [];
+  const m = msgs[msgIndex];
+  if (!m || m.claimed) return; // 如果已经领了就不管
+
+  m.claimed = true; // 标记为已领取
+  saveState();
+
+  // 弹窗提示
+  if (m.type === 'dream_redpacket') {
+    alert(`🎉 成功领取了 ${m.amount.toFixed(2)} 元！`);
+  } else {
+    alert(`🎁 成功收到了「${m.giftName}」！`);
+  }
+
+  // 刷新界面，让卡片文字变成“已领取”
+  renderChatMessages();
+}
+
 // ================= 抉择功能 =================
 function openChoicePanel() {
   closeAllBottomPanels();
@@ -2514,7 +2642,11 @@ function handleMsgAction(action, index) {
     const senderName = m.from === 'user' ? (state.profile.name || '我') : (state.dreams.find(d => d.id === state.currentChatId)?.name || '梦角');
     const quoteText = m.type === 'text' ? m.text : (m.type === 'sticker' || m.type === 'image' ? '[图片/表情]' : '卡片消息');
     
-    window.quoteData = { text: quoteText, senderName: senderName, msgId: index };
+    // 👇 新增：如果是图片或表情包，把图片数据也存进去
+    window.quoteData = { text: quoteText, senderName: senderName, msgId: index, type: m.type };
+    if (m.type === 'sticker') window.quoteData.stickerData = m.stickerData;
+    if (m.type === 'image') window.quoteData.imageData = m.imageData;
+
     document.getElementById('quotePreview').style.display = 'block';
     document.getElementById('quoteText').textContent = senderName + '：' + quoteText;
     document.getElementById('chatInput').focus();
