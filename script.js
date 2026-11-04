@@ -3344,7 +3344,13 @@ function backupData() {
   a.href = URL.createObjectURL(blob);
   a.download = '四叶草_备份_' + new Date().toISOString().slice(0,10) + '.json';
   a.click();
-  showToast('数据已备份');
+  
+  // 👇 增加判断：如果是 APP 环境，就不弹网页的 Toast 了，因为手机会弹微信分享
+  if (typeof AndroidBridge !== 'undefined') {
+     // 交给 Android 原生处理，不显示网页提示
+  } else {
+     showToast('数据已备份');
+  }
 }
 
 function restoreData(e) {
