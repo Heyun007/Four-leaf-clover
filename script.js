@@ -433,29 +433,58 @@ function renderChatMessages() {
     const avatar = isUser ? userAvatar : dreamAvatar;
     const isSticker = m.type === 'sticker';
     
-    // 👇 新增：渲染梦角发的红包和礼物卡片
-    if (m.type === 'dream_redpacket' || m.type === 'dream_gift') {
-      const isRp = m.type === 'dream_redpacket';
-      const cardBg = isRp ? 'linear-gradient(135deg, #ff8c8c, #fa5151)' : 'linear-gradient(135deg, #f5f5f7, #e8e8ed)';
-      const icon = isRp ? '🧧' : '🎁';
-      const title = isRp ? m.message : `送了你「${m.giftName}」`;
-      const statusText = m.claimed ? '已领取' : '点击领取';
-      const textColor = isRp ? '#fff' : '#333';
+    // 👇 完美复刻截图极简 UI：统一处理用户和梦角的红包/礼物卡片
+    if (m.type === 'redpacket' || m.type === 'dream_redpacket' || m.type === 'gift' || m.type === 'dream_gift') {
+      const isUser = m.from === 'user';
+      const isRp = m.type === 'redpacket' || m.type === 'dream_redpacket';
+      
+      const amount = isUser ? (isRp ? m.totalAmount : m.totalPrice) : (m.amount || 0);
+      const count = m.count || 1;
+      const title = isUser ? (isRp ? '我发的红包' : '我送的礼物') : (isRp ? `${dreamName} 发的红包` : `${dreamName} 送的礼物`);
+      const msgText = isRp ? (m.message || '大吉大利，恭喜发财') : (m.giftName || '神秘礼物') + ' ×' + count;
 
-      return `<div data-msg-index="${i}" style="display:flex;justify-content:flex-start;margin-bottom:12px; width:100%;">
-        <img src="${avatar}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin-right: 10px;">
-        <div onclick="claimDreamPacket('${m.packetId}', ${i})" style="width:220px;background:${cardBg};border-radius:12px;padding:16px;cursor:${m.claimed ? 'default' : 'pointer'}; box-shadow:0 4px 14px rgba(0,0,0,0.08);">
+      // 纯 SVG 线框图标（无 emoji）
+      const iconSvg = isRp 
+        ? `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#1d1d1f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>`
+        : `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#1d1d1f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"></rect><path d="M12 8v13"></path><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"></path><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"></path></svg>`;
+
+      let statusText = '';
+      if (m.refunded) {
+        statusText = isRp ? '已退回' : '已拒收';
+      } else if (isUser) {
+        if (m.claimed && m.claimed.length > 0) {
+          statusText = isRp ? '已领 1/1' : '已领取';
+        } else {
+          statusText = isRp ? '已领 0/1' : '待领取';
+        }
+      } else {
+        statusText = m.claimed ? '已领取' : (isRp ? '待领取' : '待收下');
+      }
+
+      // 如果已经拒收/领取，就不弹窗
+      const clickAction = isUser 
+        ? (isRp ? `openRedPacketDetail('${m.packetId}')` : `openGiftDetail('${m.packetId}')`) 
+        : `openClaimDreamPacketModal('${m.packetId}', ${i})`;
+
+      return `<div data-msg-index="${i}" style="display:flex; justify-content:${isUser ? 'flex-end' : 'flex-start'}; margin-bottom:16px; width:100%;">
+        ${!isUser ? `<img src="${avatar}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin-right: 10px;">` : ''}
+        
+        <div onclick="${clickAction}" style="width:210px; background:#f8f8fa; border-radius:12px; padding:14px 16px; cursor:pointer; box-shadow:0 2px 10px rgba(0,0,0,0.02);">
           <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-            <span style="font-size:24px;">${icon}</span>
-            <span style="font-size:14px;font-weight:600;color:${textColor}; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${title}</span>
+            ${iconSvg}
+            <span style="font-size:15px; font-weight:600; color:#1d1d1f;">${title}</span>
           </div>
-          <div style="font-size:12px;color:${isRp ? 'rgba(255,255,255,0.8)' : '#86868b'}; border-top:1px solid ${isRp ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.05)'}; padding-top:8px; display:flex; justify-content:space-between; align-items:center;">
-            <span>${isRp ? '红包' : '礼物'}</span>
-            <span>${statusText}</span>
+          <div style="font-size:14px; color:#1d1d1f; margin-bottom:12px; word-break:break-all; line-height:1.4;">${msgText}</div>
+          <div style="font-size:12px; color:#999;">
+             ${!isRp ? `${amount.toFixed(2)} 元 · ` : ''} ${statusText}
           </div>
         </div>
+
+        ${isUser ? `<img src="${avatar}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin-left: 10px;">` : ''}
       </div>`;
     }
+
+    // 👇 下面紧跟着的就是 const date = new Date... 不要删这行
     
     const date = new Date(m.time || Date.now());
     const timeStr = String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0');
@@ -1378,13 +1407,19 @@ function generateAndSendMessage(chatId, isFirst) {
   const canSendSticker = allStickers.length > 0;
   const canSendCard = usableCards.length > 0;
 
+  // 👇 终极无预设版：先检查你配了没有，没配就绝对不发！
   let sendType = 'text';
-  // 梦角发特殊卡片的判定
+  const userGifts = getGiftItems();
+  const hasGifts = userGifts && userGifts.length > 0; // 检查你有没有加礼物
+  const hasCards = usableCards.length > 0; // 检查你有没有字卡
+
   const rollSpecial = Math.random();
-  if (rollSpecial < 0.08) {
-    sendType = 'dream_redpacket'; // 8% 概率发红包
-  } else if (rollSpecial < 0.13) {
-    sendType = 'dream_gift';      // 5% 概率送礼物
+  
+  // 只有你配了字卡，梦角才会发红包；只有你配了礼物，梦角才会送礼！
+  if (rollSpecial < 0.08 && hasCards) {
+    sendType = 'dream_redpacket'; 
+  } else if (rollSpecial < 0.13 && hasGifts) {
+    sendType = 'dream_gift';      
   } else if (state.pokes && state.pokes.length > 0 && Math.random() < 0.1) {
     sendType = 'poke';
   } else {
@@ -1395,18 +1430,74 @@ function generateAndSendMessage(chatId, isFirst) {
 
   let newMsg = { from: 'dream', time: Date.now() };
 
-  // 处理梦角发红包/礼物
-  if (sendType === 'dream_redpacket' || sendType === 'dream_gift') {
+  // 处理梦角发红包/礼物（没有任何预设的鬼东西！）
+  if (sendType === 'dream_redpacket') {
     newMsg.type = sendType;
     newMsg.packetId = 'pkt_' + Date.now() + Math.floor(Math.random()*1000);
-    newMsg.claimed = false; // 初始状态为未领取
-    if (sendType === 'dream_redpacket') {
-      const amounts = [5.20, 13.14, 52.0, 6.66, 8.88, 99.99];
-      newMsg.amount = amounts[Math.floor(Math.random() * amounts.length)];
-      newMsg.message = ["拿去喝奶茶~", "请你吃糖！", "收下吧！", "一点小心意"][Math.floor(Math.random() * 4)];
+    newMsg.claimed = false;
+    
+    const amounts = [5.20, 13.14, 52.0, 6.66, 8.88, 99.99];
+    newMsg.amount = amounts[Math.floor(Math.random() * amounts.length)];
+    // 直接抽你字卡库里的话
+    newMsg.message = usableCards[Math.floor(Math.random() * usableCards.length)].text; 
+    
+  } else if (sendType === 'dream_gift') {
+    newMsg.type = sendType;
+    newMsg.packetId = 'pkt_' + Date.now() + Math.floor(Math.random()*1000);
+    newMsg.claimed = false;
+    
+    // 直接抽你礼物列表里的名字和价格
+    const pickedGift = userGifts[Math.floor(Math.random() * userGifts.length)];
+    newMsg.giftName = pickedGift.name;
+    newMsg.amount = pickedGift.price;
+    
+  } else if (sendType === 'poke') {
+    const dream = state.dreams.find(x => x.id === chatId);
+    const pokeText = state.pokes[Math.floor(Math.random() * state.pokes.length)];
+    newMsg.type = 'poke';
+    newMsg.text = pokeText;
+    newMsg.senderName = dream ? dream.name : '梦角';
+  } else if (sendType === 'sticker') {
+    newMsg.type = 'sticker';
+    newMsg.stickerData = allStickers[Math.floor(Math.random() * allStickers.length)];
+  } else {
+    newMsg.type = 'text';
+    if (canSendCard && s.cardJoinEnabled) {
+      const minN = Math.max(1, Math.min(7, s.cardJoinMin || 1));
+      const maxN = Math.max(minN, Math.min(7, s.cardJoinMax || 3));
+      let count = minN + Math.floor(Math.random() * (maxN - minN + 1));
+      let shuffled = [...usableCards].sort(() => Math.random() - 0.5);
+      let picked = shuffled.slice(0, Math.min(count, shuffled.length));
+      newMsg.text = picked.map(c => c.text).join('，');
     } else {
-      const gifts = ["一束玫瑰", "一杯奶茶", "一个盲盒", "一只小猫", "一个拥抱"];
-      newMsg.giftName = gifts[Math.floor(Math.random() * gifts.length)];
+      newMsg.text = canSendCard ? usableCards[Math.floor(Math.random() * usableCards.length)].text : '……';
+    }
+    
+    // （这里保留你原本的断句、情绪等逻辑，不用动）
+
+    // 处理梦角发红包/礼物
+    if (sendType === 'dream_redpacket' || sendType === 'dream_gift') {
+      newMsg.type = sendType;
+      newMsg.packetId = 'pkt_' + Date.now() + Math.floor(Math.random()*1000);
+      newMsg.claimed = false;
+      
+      if (sendType === 'dream_redpacket') {
+        const amounts = [5.20, 13.14, 52.0, 6.66, 8.88, 99.99];
+        newMsg.amount = amounts[Math.floor(Math.random() * amounts.length)];
+        // 👇 从你的字卡库里抽一句
+        newMsg.message = usableCards.length > 0 ? usableCards[Math.floor(Math.random() * usableCards.length)].text : "大吉大利";
+      } else {
+        // 👇 从你自己添加的礼物列表抽
+        const userGifts = getGiftItems();
+        if (userGifts && userGifts.length > 0) {
+          const pickedGift = userGifts[Math.floor(Math.random() * userGifts.length)];
+          newMsg.giftName = pickedGift.name;
+          newMsg.amount = pickedGift.price;
+        } else {
+          newMsg.giftName = "神秘礼物";
+          newMsg.amount = 5;
+        }
+      }
     }
   } else if (sendType === 'poke') {
     const dream = state.dreams.find(x => x.id === chatId);
@@ -1984,20 +2075,27 @@ function triggerIncomingCall() {
   document.getElementById('callMini').style.display = 'none';
 
   // ===== 新增：来电系统通知 =====
-  if ("Notification" in window && Notification.permission === "granted") {
+  // ===== 新增：来电震动 + 通知检测 =====
+  // 1. 手机震动（大部分手机浏览器支持，能让你马上感觉到）
+  if (navigator.vibrate) {
+    navigator.vibrate([500, 500, 500, 500, 500, 500, 500, 500]);
+  }
+
+  // 2. 系统通知（必须要在设置里开启了推送权限才会弹）
+  if (state.settings && state.settings.pushEnabled && "Notification" in window && Notification.permission === "granted") {
     try {
       const notif = new Notification('📞 ' + dream.name, {
         body: '正在呼叫你…',
-        tag: 'incoming-call',        // 固定 tag，避免重复来电时堆叠多条
-        requireInteraction: true,    // 来电是重要事件，通知常驻，不自动 5 秒消失
+        tag: 'incoming-call',
+        requireInteraction: true, // 常驻通知
         silent: false
       });
       notif.onclick = function () {
-        window.focus();            // 点通知 → 把窗口拉到前台
-        expandCall();              // 如果还响铃/通话中，就展开通话界面
+        window.focus();
+        expandCall();
         notif.close();
       };
-      window._incomingCallNotif = notif;   // 存起来，方便后面关闭
+      window._incomingCallNotif = notif;
     } catch (e) {
       console.log('来电通知失败', e);
     }
@@ -2348,7 +2446,7 @@ function sendGift(index) {
   renderChatMessages();
   closeGiftPanel();
 
-  // 梦角决定领不领 (80%概率领取)
+    // 梦角决定领不领 (80%概率领取，20%拒收)
   const chatId = state.currentChatId;
   setTimeout(() => {
     const dream = state.dreams.find(d => d.id === chatId);
@@ -2359,8 +2457,8 @@ function sendGift(index) {
       state.chatSessions[chatId].push({ from: 'system', type: 'text', text: '「' + dream.name + '」领取了礼物', time: Date.now() });
     } else {
       packet.refunded = true;
-      packet.refundReason = '梦角拒绝';
-      state.chatSessions[chatId].push({ from: 'system', type: 'text', text: '「' + dream.name + '」拒绝了礼物', time: Date.now() });
+      packet.refundReason = '梦角拒收';
+      state.chatSessions[chatId].push({ from: 'system', type: 'text', text: '「' + dream.name + '」拒收了你的礼物', time: Date.now() });
     }
     saveState();
     
@@ -2368,7 +2466,6 @@ function sendGift(index) {
       renderChatMessages();
     }
   }, 2000 + Math.random() * 3000);
-}
 
 function openGiftDetail(packetId) {
   if (!state.currentChatId) return;
@@ -5474,6 +5571,55 @@ function endGomokuAiMatch(match, winnerId) {
 
 // 开启定时器
 setInterval(startRandomAiMatch, 60 * 1000);
+
+// 弹窗让用户选择收下还是拒收梦角的红包/礼物
+function openClaimDreamPacketModal(packetId, msgIndex) {
+  if (!state.currentChatId) return;
+  const msgs = state.chatSessions[state.currentChatId] || [];
+  const m = msgs[msgIndex];
+  
+  if (!m) return;
+  if (m.claimed) return showToast('已经收下啦');
+  if (m.refunded) return showToast('已经拒收啦');
+
+  const isRp = m.type === 'dream_redpacket';
+  // 弹出系统提示框，让你选
+  const action = confirm(`「${m.message || m.giftName}」\n\n你要收下这个${isRp ? '红包' : '礼物'}吗？\n点【确定】收下，点【取消】拒收。`);
+
+  // 弹窗让用户选择收下还是拒收梦角的红包/礼物
+function openClaimDreamPacketModal(packetId, msgIndex) {
+  if (!state.currentChatId) return;
+  const msgs = state.chatSessions[state.currentChatId] || [];
+  const m = msgs[msgIndex];
+  
+  if (!m) return;
+  if (m.claimed) return showToast('已经收下啦');
+  if (m.refunded) return showToast('已经拒收啦');
+
+  const isRp = m.type === 'dream_redpacket';
+  // 弹出系统提示框，让你选
+  const action = confirm(`「${m.message || m.giftName}」\n\n你要收下这个${isRp ? '红包' : '礼物'}吗？\n点【确定】收下，点【取消】拒收。`);
+
+  if (action) {
+    m.claimed = true;
+    saveState();
+    
+    // 👇 终极纯文字版，绝对没有任何 emoji
+    if (isRp) {
+      alert(`成功领取了 ${m.amount.toFixed(2)} 元！`);
+    } else {
+      alert(`成功收到了「${m.giftName}」！`);
+    }
+    
+    renderChatMessages();
+  } else {
+    m.refunded = true;
+    m.claimed = false;
+    saveState();
+    showToast('已拒收');
+    renderChatMessages();
+  }
+}
 
 // 启动（确保在最后调用）
 loadState();
