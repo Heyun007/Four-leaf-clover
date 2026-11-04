@@ -49,7 +49,7 @@ async function loadState() {
   renderAll();
   setTimeout(() => { try { applyBeautifySettings(); } catch(e) {} }, 500);
 
-  // 👇 强制进聊天逻辑：只要有一个梦角，无论如何都进他的聊天！
+  // 👇 强制进聊天逻辑
   if (state.dreams.length > 0) {
     // 如果上次聊的梦角丢了，直接强行拉第一个梦角
     if (!state.currentChatId || !state.dreams.some(d => d.id === state.currentChatId)) {
@@ -57,7 +57,20 @@ async function loadState() {
     }
     openChat(state.currentChatId);
   } else {
-    navigateTo('pageContacts');
+    // 🚨 如果连一个梦角都没有，直接给你自动创建一个默认梦角！
+    // 这样就算数据全丢了，一进来也是聊天界面，绝对不会再看到通讯录。
+    const defaultDream = {
+      id: 'd_default_' + Date.now(),
+      name: '梦角',
+      avatar: '',
+      statuses: ['在线'],
+      currentStatus: '在线',
+      balance: 100
+    };
+    state.dreams.push(defaultDream);
+    state.currentChatId = defaultDream.id;
+    saveState();
+    openChat(state.currentChatId);
   }
 }
 
@@ -2537,17 +2550,14 @@ function goBack() {
       }
       openChat(state.currentChatId);
     } else {
-      navigateTo('pageContacts');
+      // 没梦角也去聊天，反正刚才已经自动建了一个
+      navigateTo('pageChat');
     }
   } catch (err) {
     console.error("进入聊天报错，已强行拦截:", err);
-    if (state.dreams.length > 0) {
-      navigateTo('pageChat');
-    } else {
-      navigateTo('pageContacts');
-    }
+    navigateTo('pageChat');
   }
-}
+ }
 
 // ================= 长按消息逻辑 =================
 let pressTimer = null;
@@ -3388,20 +3398,9 @@ function restoreData(e) {
         state.currentChatId = state.dreams[0].id;
       }
 
-      // ===== 关键：先检测大小，再真正等待保存成功 =====
+      // ===== 删除了所有 alert 警告，直接静默保存 =====
       const dataStr = JSON.stringify(state);
-      const sizeInMB = new TextEncoder().encode(dataStr).length / (1024 * 1024);
-      console.log('📦 导入数据大小:', sizeInMB.toFixed(2), 'MB');
-
-      if (sizeInMB > 4.8) {
-        alert('⚠️ 警告：导入数据 ' + sizeInMB.toFixed(1) + 'MB，超出 localStorage 5MB 上限！\n\n'
-          + '导入可能失败。\n\n建议：\n'
-          + '1. 先备份当前数据\n'
-          + '2. 清理不需要的表情包、头像库、聊天图片\n'
-          + '3. 重新导出后再导入');
-      }
-
-      // 等待真正保存完成后再刷新
+      
       localforage.setItem('myAppState', JSON.parse(dataStr))
         .then(() => {
           showToast('✅ 恢复成功，正在进入聊天...');
@@ -3409,14 +3408,8 @@ function restoreData(e) {
         })
         .catch(err => {
           console.error('❌ 保存失败:', err);
-          alert('❌ 导入失败！\n\n'
-            + '原因：数据太大（' + sizeInMB.toFixed(1) + 'MB），超出 localStorage 5MB 上限。\n\n'
-            + '解决建议：\n'
-            + '1. 清理不需要的表情包分组\n'
-            + '2. 减少头像库图片\n'
-            + '3. 删除旧聊天记录里的图片\n'
-            + '4. 清理后再重新导入');
-          // 不 reload，让用户可以检查当前状态
+          // 如果真失败了，用网页内置的小黑条提示，不用原生弹窗
+          showToast('❌ 导入失败：存储空间不足或未开启大容量模式');
         });
 
     } catch (err) {
@@ -3427,7 +3420,6 @@ function restoreData(e) {
   reader.readAsText(file);
   e.target.value = '';
 }
-
 function clearAllData() {
   if (!confirm('确定要清除所有数据吗？不可撤销！')) return;
   localforage.clear().then(() => {
