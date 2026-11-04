@@ -3422,10 +3422,37 @@ function restoreData(e) {
 }
 function clearAllData() {
   if (!confirm('确定要清除所有数据吗？不可撤销！')) return;
-  localforage.clear().then(() => {
-    localStorage.clear();
-    location.reload();
-  });
+
+  // 1. 先清空内存，防止定时器又把数据存回去
+  state = {}; 
+  if (window._replyTimers) {
+    window._replyTimers.forEach(clearTimeout);
+    window._replyTimers = [];
+  }
+
+  // 2. 清空本地基础存储
+  localStorage.clear();
+  sessionStorage.clear();
+
+  // 3. 暴力清理 localforage 和 IndexedDB 数据库
+  if (typeof localforage !== 'undefined') {
+    localforage.clear().finally(() => {
+      // 彻底删掉底层 IndexedDB 数据库（你的配置名叫 'MyNewApp'）
+      if (window.indexedDB) {
+        indexedDB.deleteDatabase('MyNewApp');
+        indexedDB.deleteDatabase('localforage');
+      }
+      // 强制刷新页面（true 代表绕过缓存）
+      location.reload(true); 
+    });
+  } else {
+    // 如果 localforage 库没加载出来，直接删库并刷新
+    if (window.indexedDB) {
+      indexedDB.deleteDatabase('MyNewApp');
+      indexedDB.deleteDatabase('localforage');
+    }
+    location.reload(true);
+  }
 }
 
 // ================= 主动找我定时器 =================
