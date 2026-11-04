@@ -5200,7 +5200,7 @@ setInterval(checkAutoCommentOnDiary, 10 * 60 * 1000); // 每10分钟检查一次
 function startRandomAiMatch() {
   if (!state.dreams || state.dreams.length < 2) return;
   if (state.gomokuAiMatches && state.gomokuAiMatches.some(m => m.active)) return; // 已有对局在进行
-  if (Math.random() > 0.05) return; // 每分钟 5% 触发率，差不多 20 分钟一场
+  if (Math.random() > 0.005) return; // 每分钟 0.5% 触发率，差不多 200 分钟一场
 
   const d1 = state.dreams[Math.floor(Math.random() * state.dreams.length)];
   const d2 = state.dreams.filter(d => d.id !== d1.id)[Math.floor(Math.random() * (state.dreams.length - 1))];
