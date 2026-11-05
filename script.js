@@ -1303,7 +1303,7 @@ function triggerDreamReply() {
   const msgs = state.chatSessions[chatIdAtSend] || [];
 
   // 1. 偷偷收藏
-  if (Math.random() < 0.15) {
+  if (Math.random() < 0.03) {
     const userMsgs = msgs.filter(m => m.from === 'user' && (m.type === 'text' || m.type === 'sticker' || m.type === 'image'));
     if (userMsgs.length > 0) {
       const targetMsg = userMsgs[userMsgs.length - 1];
@@ -5248,15 +5248,33 @@ function checkAutoDiary() {
     const usableCards = state.cards.filter(c => (c.dreamId || 'all') === 'all' || c.dreamId === dream.id);
     if (usableCards.length === 0) return;
     
+    // 抽取文字
     const count = 2 + Math.floor(Math.random() * 4);
     const text = [...usableCards].sort(() => Math.random() - 0.5).slice(0, count).map(c => c.text).join('\n');
+
+    // 👇 新增：从表情库里收集所有图片
+    let allStickers = [];
+    if (state.stickerGroups) {
+      state.stickerGroups.forEach(g => {
+        if (g.items) allStickers = allStickers.concat(g.items);
+      });
+    }
+
+    // 👇 随机决定发多少张图（0 到 9 张）
+    let pickedImages = [];
+    const imageCount = Math.floor(Math.random() * 10); // 生成 0 到 9 的随机整数
+
+    if (allStickers.length > 0 && imageCount > 0) {
+      const shuffledStickers = [...allStickers].sort(() => Math.random() - 0.5);
+      pickedImages = shuffledStickers.slice(0, Math.min(imageCount, shuffledStickers.length));
+    }
 
     state.diaries.push({
       id: 'diary_' + Date.now() + Math.random().toString(36).slice(2,6),
       authorId: dream.id,
       authorName: dream.name,
       text: text,
-      images: [],
+      images: pickedImages, // 👈 放入 0-9 张随机表情包
       likes: [], mood: '开心', weather: '晴朗',
       time: Date.now(),
       comments: []
@@ -5531,5 +5549,102 @@ function openClaimDreamPacketModal(packetId, msgIndex) {
     renderChatMessages();
   }
 }
+
+// ================= 通话悬浮球拖拽功能 =================
+document.addEventListener('DOMContentLoaded', () => {
+  const callMini = document.getElementById('callMini');
+  if (!callMini) return;
+
+  let isDragging = false;
+  let hasMoved = false;
+  let startX, startY, initialLeft, initialTop;
+
+  // 鼠标和触摸开始
+  function onDragStart(e) {
+    // 兼容触摸屏和鼠标
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    
+    isDragging = true;
+    hasMoved = false;
+    
+    // 获取手机外壳的范围
+    const phoneRect = document.querySelector('.phone-container').getBoundingClientRect();
+    
+    // 计算当前悬浮球相对手机外壳的位置
+    const rect = callMini.getBoundingClientRect();
+    initialLeft = rect.left - phoneRect.left;
+    initialTop = rect.top - phoneRect.top;
+    
+    // 将 bottom 和 right 定位改为 left 和 top，这样才能自由拖动
+    callMini.style.right = 'auto';
+    callMini.style.bottom = 'auto';
+    callMini.style.left = initialLeft + 'px';
+    callMini.style.top = initialTop + 'px';
+    
+    startX = clientX;
+    startY = clientY;
+    
+    // 阻止默认事件（防止拖拽时选中文本或滚动屏幕）
+    e.preventDefault();
+  }
+
+  // 鼠标和触摸移动
+  function onDragMove(e) {
+    if (!isDragging) return;
+    
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    
+    const dx = clientX - startX;
+    const dy = clientY - startY;
+    
+    // 如果移动距离超过 5px，就判定为拖拽，而不是点击
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+      hasMoved = true;
+    }
+    
+    // 边界限制，防止拖出手机屏幕外
+    const phoneContainer = document.querySelector('.phone-container');
+    const maxLeft = phoneContainer.offsetWidth - callMini.offsetWidth;
+    const maxTop = phoneContainer.offsetHeight - callMini.offsetHeight;
+    
+    let newLeft = initialLeft + dx;
+    let newTop = initialTop + dy;
+    
+    if (newLeft < 0) newLeft = 0;
+    if (newLeft > maxLeft) newLeft = maxLeft;
+    if (newTop < 0) newTop = 0;
+    if (newTop > maxTop) newTop = maxTop;
+    
+    callMini.style.left = newLeft + 'px';
+    callMini.style.top = newTop + 'px';
+  }
+
+  // 鼠标和触摸结束
+  function onDragEnd(e) {
+    if (!isDragging) return;
+    isDragging = false;
+  }
+
+  // 重写点击事件，防止拖拽结束时误触打开通话
+  callMini.onclick = function(e) {
+    if (hasMoved) {
+      // 如果刚刚发生过拖拽，就不触发展开通话
+      hasMoved = false;
+      return;
+    }
+    expandCall();
+  };
+
+  // 绑定事件 (同时兼容 PC 和 手机)
+  callMini.addEventListener('mousedown', onDragStart);
+  document.addEventListener('mousemove', onDragMove);
+  document.addEventListener('mouseup', onDragEnd);
+  
+  callMini.addEventListener('touchstart', onDragStart, { passive: false });
+  document.addEventListener('touchmove', onDragMove, { passive: false });
+  document.addEventListener('touchend', onDragEnd);
+});
 
 loadState();
