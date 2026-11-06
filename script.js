@@ -429,6 +429,30 @@ function renderChatMessages() {
       </div>`;
     }
 
+        // 👇 抉择卡片渲染
+    if (m.type === 'choice') {
+      const isAnswered = m.answer !== null;
+      let optionsHtml = m.options.map(opt => {
+        const isPicked = m.answer === opt;
+        return `<div style="padding:8px 12px; margin-top:6px; border-radius:8px; font-size:13px; 
+          background:${isPicked ? 'rgba(0,122,255,0.1)' : '#f5f5f7'}; 
+          color:${isPicked ? '#007aff' : '#333'};
+          border:1px solid ${isPicked ? '#007aff' : 'transparent'};">
+          ${opt} ${isPicked ? '<span style="float:right;">✓</span>' : ''}
+        </div>`;
+      }).join('');
+
+      return `<div data-msg-index="${i}" style="display:flex; justify-content:flex-end; margin-bottom:12px; width:100%;">
+        <div style="width:240px;background:#fff;border-radius:12px;padding:16px;box-shadow:0 4px 14px rgba(0,0,0,0.05);border:1px solid #e5e5ea;">
+          <div style="font-size:14px;font-weight:600;color:#1d1d1f;margin-bottom:12px;">📊 抉择</div>
+          <div style="font-size:13px;color:#333;margin-bottom:10px;">${m.question}</div>
+          ${optionsHtml}
+          ${isAnswered ? `<div style="margin-top:12px; font-size:12px; color:#86868b; text-align:right;">对方选择了：${m.answer}</div>` : ''}
+        </div>
+      </div>`;
+    }
+
+
     const isUser = m.from === 'user';
     const avatar = isUser ? userAvatar : dreamAvatar;
     const isSticker = m.type === 'sticker';
@@ -1074,6 +1098,12 @@ function compressSticker(file) {
   return new Promise(function(resolve, reject) {
     var reader = new FileReader();
     reader.onload = function(ev) {
+      // 如果是 GIF，直接使用原图，不走 Canvas 压缩，保留动图效果
+      if (file.type === 'image/gif') {
+        resolve(ev.target.result);
+        return;
+      }
+      
       var img = new Image();
       img.onload = function() {
         var canvas = document.createElement('canvas');
@@ -3693,14 +3723,17 @@ function renderMailList() {
     const preview = (m.content || '').replace(/\n/g, ' ').slice(0, 30);
 
     return `
-      <div onclick="openLetterDetail('${m.id}')" style="padding:14px 16px; border-bottom:1px solid var(--border); background:#fff; cursor:pointer;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-          <span style="font-size:14px; font-weight:600; color:#1d1d1f;">${statusHtml}${whoText}</span>
-          <span style="font-size:11px; color:#b0b0b5;">${timeStr}</span>
-        </div>
-        <div style="font-size:13px; color:#86868b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${preview}</div>
+  <div style="position:relative; padding:14px 16px; border-bottom:1px solid var(--border); background:#fff;">
+    <div onclick="openLetterDetail('${m.id}')" style="cursor:pointer;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <span style="font-size:14px; font-weight:600; color:#1d1d1f;">${statusHtml}${whoText}</span>
+        <span style="font-size:11px; color:#b0b0b5;">${timeStr}</span>
       </div>
-    `;
+      <div style="font-size:13px; color:#86868b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${preview}</div>
+    </div>
+    <span onclick="deleteMail('${m.id}')" style="position:absolute; right:16px; bottom:14px; font-size:12px; color:#ff3b30; padding:4px; cursor:pointer;">删除</span>
+  </div>
+`;
   }).join('');
 }
 
@@ -4384,7 +4417,7 @@ function startGomokuMatch() {
   drawGomokuBoard();
   addGomokuChat('system', `游戏开始！你执${gomoku.userColor === 1 ? '黑' : '白'}，${getDreamName(gomoku.dreamId)}执${gomoku.aiColor === 1 ? '黑' : '白'}。`);
   
-  if (!gomoku.isUserTurn) setTimeout(aiGomokuMove, 800);
+ if (gomoku.aiColor === 1) setTimeout(aiGomokuMove, 800); // 只要梦角执黑（先手），必定触发
 }
 
 function drawGomokuBoard() {
@@ -4509,7 +4542,9 @@ function userResign() {
 }
 
 function aiGomokuMove(isUndoAction) {
-  if (!gomoku.active || gomoku.isUserTurn) return;
+  if (!gomoku.active) return;
+// 直接判断当前回合颜色，是不是 AI 的颜色，如果不是，直接退出
+if (gomoku.currentTurn !== gomoku.aiColor) return;
   if (Math.random() < 0.01) {
     gomoku.active = false; updateGomokuUI();
     addGomokuChat('system', `${getDreamName(gomoku.dreamId)} 认输了！你赢了！`);
@@ -5037,7 +5072,7 @@ function renderDiaryList() {
         <div class="diary-item-tags"><span>🌤 ${d.weather}</span><span>💭 ${d.mood}</span></div>
         <div class="diary-item-foot">
           <span class="diary-item-time">${timeStr}</span>
-          ${d.authorId === 'user' ? `<span class="diary-item-del" onclick="deleteDiary('${d.id}')">删除</span>` : ''}
+         <span class="diary-item-del" onclick="deleteDiary('${d.id}')">删除</span>
         </div>
         <div style="display:flex;justify-content:flex-start;align-items:center;margin-top:6px;gap:12px;">
           <span onclick="toggleLikeDiary('${d.id}')" style="font-size:13px;color:${isLiked ? '#d6336c' : '#576b95'};cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
@@ -5559,92 +5594,68 @@ document.addEventListener('DOMContentLoaded', () => {
   let hasMoved = false;
   let startX, startY, initialLeft, initialTop;
 
-  // 鼠标和触摸开始
   function onDragStart(e) {
-    // 兼容触摸屏和鼠标
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    
     isDragging = true;
     hasMoved = false;
     
-    // 获取手机外壳的范围
     const phoneRect = document.querySelector('.phone-container').getBoundingClientRect();
-    
-    // 计算当前悬浮球相对手机外壳的位置
     const rect = callMini.getBoundingClientRect();
     initialLeft = rect.left - phoneRect.left;
     initialTop = rect.top - phoneRect.top;
     
-    // 将 bottom 和 right 定位改为 left 和 top，这样才能自由拖动
     callMini.style.right = 'auto';
     callMini.style.bottom = 'auto';
     callMini.style.left = initialLeft + 'px';
     callMini.style.top = initialTop + 'px';
     
-    startX = clientX;
-    startY = clientY;
-    
-    // 阻止默认事件（防止拖拽时选中文本或滚动屏幕）
+    startX = clientX; startY = clientY;
     e.preventDefault();
   }
 
-  // 鼠标和触摸移动
   function onDragMove(e) {
     if (!isDragging) return;
-    
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    
     const dx = clientX - startX;
     const dy = clientY - startY;
     
-    // 如果移动距离超过 5px，就判定为拖拽，而不是点击
-    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
-      hasMoved = true;
-    }
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) hasMoved = true;
     
-    // 边界限制，防止拖出手机屏幕外
     const phoneContainer = document.querySelector('.phone-container');
     const maxLeft = phoneContainer.offsetWidth - callMini.offsetWidth;
     const maxTop = phoneContainer.offsetHeight - callMini.offsetHeight;
     
-    let newLeft = initialLeft + dx;
-    let newTop = initialTop + dy;
-    
-    if (newLeft < 0) newLeft = 0;
-    if (newLeft > maxLeft) newLeft = maxLeft;
-    if (newTop < 0) newTop = 0;
-    if (newTop > maxTop) newTop = maxTop;
+    let newLeft = Math.max(0, Math.min(maxLeft, initialLeft + dx));
+    let newTop = Math.max(0, Math.min(maxTop, initialTop + dy));
     
     callMini.style.left = newLeft + 'px';
     callMini.style.top = newTop + 'px';
   }
 
-  // 鼠标和触摸结束
   function onDragEnd(e) {
-    if (!isDragging) return;
-    isDragging = false;
+    if (isDragging) {
+      isDragging = false;
+      // 如果没移动，就当做是点击，触发放大
+      if (!hasMoved) expandCall();
+    }
   }
 
-  // 重写点击事件，防止拖拽结束时误触打开通话
-  callMini.onclick = function(e) {
-    if (hasMoved) {
-      // 如果刚刚发生过拖拽，就不触发展开通话
-      hasMoved = false;
-      return;
-    }
-    expandCall();
-  };
-
-  // 绑定事件 (同时兼容 PC 和 手机)
   callMini.addEventListener('mousedown', onDragStart);
   document.addEventListener('mousemove', onDragMove);
   document.addEventListener('mouseup', onDragEnd);
-  
   callMini.addEventListener('touchstart', onDragStart, { passive: false });
   document.addEventListener('touchmove', onDragMove, { passive: false });
   document.addEventListener('touchend', onDragEnd);
 });
+
+function deleteMail(id) {
+  if (!confirm('确定删除这封信件吗？')) return;
+  state.mails = state.mails.filter(m => m.id !== id);
+  saveState();
+  renderMailList();
+  showToast('已删除');
+}
 
 loadState();
