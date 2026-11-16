@@ -1649,7 +1649,7 @@ function generateAndSendMessage(chatId, isFirst) {
     let isAdvancedQuoteTriggered = false;
 
     // 1. 👇 新增：进阶引用（直接复读/截取用户的话，15%概率）
-    if (Math.random() < 0.15) {
+        if (s.advancedQuoteEnabled !== false && Math.random() < 0.15) {
       // 找最近的一条用户纯文字消息
       const recentTexts = userMsgs.filter(m => m.type === 'text' && m.text.trim().length > 1);
       if (recentTexts.length > 0) {
@@ -3615,6 +3615,7 @@ function initChatSettingPage() {
   document.getElementById('intentToggle').classList.toggle('on', s.intentEnabled !== false);
   document.getElementById('cardJoinToggle').classList.toggle('on', !!s.cardJoinEnabled);
   document.getElementById('dreamQuoteToggle').classList.toggle('on', s.dreamQuoteEnabled !== false);
+  document.getElementById('advancedQuoteToggle').classList.toggle('on', s.advancedQuoteEnabled !== false);
 
   // 填入数字
   if (document.getElementById('replyMinSec')) document.getElementById('replyMinSec').value = s.replyMinSec != null ? s.replyMinSec : 3;
