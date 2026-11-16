@@ -492,6 +492,19 @@ function renderChatMessages() {
         ${isUser ? `<img src="${avatar}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin-left: 10px;">` : ''}
       </div>`;
     }
+
+        // 👇 定义进阶提示小字
+    let addedToCardHtml = '';
+    if (isUser && m.addedToCard) {
+      const dreamName = state.dreams.find(d => d.id === state.currentChatId)?.name || '梦角';
+      addedToCardHtml = `<div style="margin-top: 4px; font-size: 10px; color: ${subColor}; font-style: italic;">此句已被 ${dreamName} 添加至字卡库</div>`;
+    }
+
+    let advancedQuoteHtml = '';
+    if (m.quoteAdvanced) {
+      const dreamName = state.dreams.find(d => d.id === state.currentChatId)?.name || '梦角';
+      advancedQuoteHtml = `<div style="margin-bottom: 4px; font-size: 10px; color: ${subColor}; font-style: italic;">${dreamName} 引用了你以前说的一句话</div>`;
+    }
     
     const date = new Date(m.time || Date.now());
     const timeStr = String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0');
@@ -538,15 +551,15 @@ function renderChatMessages() {
         </div>`;
       }
 
-            // 👇 进阶引用的提示小字
-      let advancedQuoteHtml = '';
-      if (m.quoteAdvanced) {
-        const dreamName = state.dreams.find(d => d.id === state.currentChatId)?.name || '梦角';
-        advancedQuoteHtml = `<div style="margin-bottom: 4px; font-size: 10px; color: ${subColor}; font-style: italic;">${dreamName} 引用了你以前说的一句话</div>`;
-      }
+    // 👇 确保这两个变量被定义了，否则会报错白屏！
+    let advancedQuoteHtml = '';
+    let addedToCardHtml = '';
 
-      // 把它塞进气泡
-      bubbleContent = `${advancedQuoteHtml}<div class="${textClass}">${m.text}</div>${emotionHtml}`;
+    if (m.quoteAdvanced) {
+      const dreamName = state.dreams.find(d => d.id === state.currentChatId)?.name || '梦角';
+      advancedQuoteHtml = `<div style="margin-bottom: 4px; font-size: 10px; color: ${subColor}; font-style: italic;">${dreamName} 引用了你以前说的一句话</div>`;
+    }
+    bubbleContent = `${advancedQuoteHtml}<div class="${textClass}">${m.text}</div>${emotionHtml}`;
     }
 
     const sideClass = isUser ? 'bubble-user' : 'bubble-dream';
