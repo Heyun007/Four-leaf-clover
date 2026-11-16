@@ -673,10 +673,43 @@ function renderCards() {
     state.dreams.forEach(function(d) {
       html += '<option value="' + d.id + '">' + d.name + ' 专属</option>';
     });
+    // 👇 核心新增：给每个梦角加一个专属的“主动添加”库
+    state.dreams.forEach(function(d) {
+      html += '<option value="dream_added_' + d.id + '">' + d.name + ' 主动添加</option>';
+    });
+    
     ownerSelect.innerHTML = html;
     ownerSelect.value = currentCardOwner;
   }
 
+  // 👇 核心处理：如果当前选中的是“主动添加”库
+  if (currentCardOwner.startsWith('dream_added_')) {
+    var dId = currentCardOwner.replace('dream_added_', '');
+    var addedCards = state.cards.filter(function(c) {
+      return c.dreamId === dId && c.addedByDream;
+    });
+    
+    var searchTerm = (document.getElementById('cardSearchInput').value || '').trim();
+    if (searchTerm) {
+      addedCards = addedCards.filter(c => c.text && c.text.indexOf(searchTerm) > -1);
+    }
+
+    var bodyHtml = '';
+    if (addedCards.length === 0) {
+      bodyHtml = '<div class="card-empty">梦角还没有主动添加过字卡哦</div>';
+    } else {
+      bodyHtml = '<div class="card-count">共 ' + addedCards.length + ' 条</div><div class="card-list">';
+      addedCards.forEach(function(c) { 
+        // 复用之前的单张字卡渲染，带[梦角添加]标签，支持编辑删除屏蔽
+        bodyHtml += renderSingleCardHtml(c); 
+      });
+      bodyHtml += '</div>';
+    }
+    container.innerHTML = bodyHtml;
+    return; // 处理完主动添加库直接退出，不走下面的分类渲染
+  }
+
+  // ===== 下面是原有的通用和专属渲染逻辑 =====
   var filteredCards = state.cards.filter(function(c) {
     return (c.dreamId || 'all') === currentCardOwner;
   });
@@ -714,25 +747,21 @@ function renderCards() {
         cardsHtml += '</div>';
       }
 
-      // 完美版本的头部代码，绝不误触
       groupsHtml += '<div class="category-group' + (catBlocked ? ' blocked' : '') + '">';
       groupsHtml += '<div class="category-header" style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px;">';
       
-      // 左侧：点名字折叠
       groupsHtml += '<div onclick="toggleCategory(\'' + cat.id + '\')" style="flex:1; cursor:pointer; display:flex; align-items:center; padding:4px 0;">';
       groupsHtml += '<span class="cat-name">' + cat.name + '（' + cards.length + '）</span>';
       groupsHtml += '</div>';
 
-      // 右侧：屏蔽、删除、折叠箭头
       groupsHtml += '<div class="cat-actions" style="display:flex; align-items:center; gap:12px;">';
       groupsHtml += '<span class="cat-action" onclick="toggleBlockCategory(\'' + cat.id + '\')" title="屏蔽本组">' + (catBlocked ? '🔇' : '🔊') + '</span>';
       groupsHtml += '<span class="cat-action" onclick="deleteCategory(\'' + cat.id + '\')" title="删除本组">🗑</span>';
       groupsHtml += '<span class="cat-toggle' + (collapsed ? ' collapsed' : '') + '" onclick="toggleCategory(\'' + cat.id + '\')" style="cursor:pointer; font-size:12px; padding:4px;">▼</span>'; 
       groupsHtml += '</div></div>';
 
-      // 👇 这里就是上一次漏掉的！一定要有这行！
       groupsHtml += '<div class="category-body' + (collapsed ? ' hidden' : '') + '">' + cardsHtml + '</div></div>'; 
-    }); // 👈 这里的闭合括号也是上次漏掉的！！
+    }); 
 
     if (filteredCats.length === 0) {
       groupsHtml = '<div class="card-empty">还没有分类，请点击上方「+ 分类」</div>';
@@ -1398,10 +1427,10 @@ function triggerDreamReply() {
       const exists = state.cards.some(c => c.text === txt && (c.dreamId || 'all') === chatIdAtSend);
       if (!exists) {
         // 加入到对应梦角的专属分类里（如果没有专属分类，就默认加到通用）
-        state.cards.push({
+                state.cards.push({
           id: 'card_' + Date.now(),
           text: txt,
-          cat: (state.categories.find(c => c.dreamId === chatIdAtSend) || state.categories[0]).id,
+          cat: 'dream_added', // 虚拟分类，不走普通分组
           dreamId: chatIdAtSend,
           addedByDream: true // 标记是梦角添加的
         });
