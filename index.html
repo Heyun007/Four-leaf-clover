@@ -646,12 +646,22 @@
             </div>
           </div>
 
+                   <div class="setting-item" style="border:1px solid var(--blue);">
+            <div class="si-left">
+              <span class="si-label">自由分段重组</span>
+              <span class="si-desc">梦角有概率将句子打碎并重新拼接</span>
+            </div>
+            <div class="setting-toggle" id="cutToggle" onclick="toggleChatSetting('cutEnabled')">
+              <div class="toggle-knob"></div>
+            </div>
+          </div>
+
           <div class="setting-item" style="border:1px solid var(--blue);">
             <div class="si-left">
               <span class="si-label">自由断句</span>
               <span class="si-desc">梦角有概率只说半句话（带渐变）</span>
             </div>
-            <div class="setting-toggle" id="cutToggle" onclick="toggleChatSetting('cutEnabled')">
+            <div class="setting-toggle" id="trueCutToggle" onclick="toggleChatSetting('trueCutEnabled')">
               <div class="toggle-knob"></div>
             </div>
           </div>
