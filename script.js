@@ -3774,16 +3774,21 @@ function checkAutoMessage() {
   });
   var text = usableCards.length > 0 ? usableCards[Math.floor(Math.random() * usableCards.length)].text : '你在忙吗？';
   
-  // 👇 加入随机情绪标签
+    // 👇 加入随机情绪标签
   var emotions = ['开心', '难过', '激动', '平静', '疲惫', '想念', '感动', '心慌', '生气', '冷静', '无聊', '焦虑', '兴奋', '害羞', '期待', '幸福', '孤单'];
   var randomEmotion = emotions[Math.floor(Math.random() * emotions.length)];
+
+  // 👇 新增：加入交流意图标签
+  var intents = ['不想说话', '想和你聊聊', '逃避话题', '不知道说什么', '词穷了', '喜欢这个话题', '不太感兴趣', '商量一下', '随便说说'];
+  var randomIntent = intents[Math.floor(Math.random() * intents.length)];
 
   if (!state.chatSessions[picked.id]) state.chatSessions[picked.id] = [];
   state.chatSessions[picked.id].push({
     from: 'dream',
     type: 'text',
     text: text,
-    emotion: randomEmotion, // 👈 情绪标签
+    emotion: state.settings.emotionEnabled !== false ? randomEmotion : null, // 受开关控制
+    intent: state.settings.intentEnabled !== false ? randomIntent : null, // 👈 受开关控制
     time: now,
     status: 'unread'
   });
