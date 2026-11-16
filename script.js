@@ -538,7 +538,15 @@ function renderChatMessages() {
         </div>`;
       }
 
-      bubbleContent = `<div class="${textClass}">${m.text}</div>${emotionHtml}`;
+            // 👇 进阶引用的提示小字
+      let advancedQuoteHtml = '';
+      if (m.quoteAdvanced) {
+        const dreamName = state.dreams.find(d => d.id === state.currentChatId)?.name || '梦角';
+        advancedQuoteHtml = `<div style="margin-bottom: 4px; font-size: 10px; color: ${subColor}; font-style: italic;">${dreamName} 引用了你以前说的一句话</div>`;
+      }
+
+      // 把它塞进气泡
+      bubbleContent = `${advancedQuoteHtml}<div class="${textClass}">${m.text}</div>${emotionHtml}`;
     }
 
     const sideClass = isUser ? 'bubble-user' : 'bubble-dream';
@@ -580,6 +588,7 @@ function renderChatMessages() {
             <span>${bubbleContent}</span>
           </div>
           <div style="display: block;">
+            ${addedToCardHtml}
             ${statusHtml}
           </div>
         </div>
@@ -731,7 +740,7 @@ function renderCards() {
 function renderSingleCardHtml(c) {
   var blocked = c.blocked || false;
   var html = '<div class="card-item' + (blocked ? ' blocked' : '') + '">';
-  html += '<div class="card-item-text">' + (c.text || '') + '</div>';
+  html += '<div class="card-item-text">' + (c.text || '') + (c.addedByDream ? '<span style="font-size:10px; color:#ff9500; margin-left:6px; background:rgba(255,149,0,0.1); padding:1px 4px; border-radius:4px;">梦角添加</span>' : '') + '</div>';
   html += '<div class="card-item-actions">';
   html += '<span onclick="toggleBlockCard(\'' + c.id + '\')" title="' + (blocked ? '取消屏蔽' : '屏蔽') + '">' + (blocked ? '🔇' : '🔊') + '</span>';
   html += '<span onclick="editCard(\'' + c.id + '\')" title="编辑">✎</span>';
@@ -1374,6 +1383,32 @@ function triggerDreamReply() {
     }
   }
 
+    // 👇 梦角主动将用户的话添加至字卡库（20%概率）
+  const lastUserTextMsg = msgs.filter(m => m.from === 'user' && m.type === 'text').pop();
+  if (lastUserTextMsg && lastUserTextMsg.text && lastUserTextMsg.text.length > 2 && lastUserTextMsg.text.length < 50) {
+    if (Math.random() < 0.20 && !lastUserTextMsg.addedToCard) {
+      const txt = lastUserTextMsg.text.trim();
+      // 检查是否已经存在该字卡
+      const exists = state.cards.some(c => c.text === txt && (c.dreamId || 'all') === chatIdAtSend);
+      if (!exists) {
+        // 加入到对应梦角的专属分类里（如果没有专属分类，就默认加到通用）
+        state.cards.push({
+          id: 'card_' + Date.now(),
+          text: txt,
+          cat: (state.categories.find(c => c.dreamId === chatIdAtSend) || state.categories[0]).id,
+          dreamId: chatIdAtSend,
+          addedByDream: true // 标记是梦角添加的
+        });
+        lastUserTextMsg.addedToCard = true; // 给用户那条消息打上标记
+        saveState();
+        // 稍微刷新一下界面
+        setTimeout(() => {
+          if (state.currentChatId === chatIdAtSend) renderChatMessages();
+        }, 1000);
+      }
+    }
+  }
+
   // 2. 标记已读
   let hasUnread = false;
   msgs.forEach(m => { if (m.from === 'user' && m.status === 'unread') { m.status = 'read'; hasUnread = true; } });
@@ -1603,12 +1638,53 @@ function generateAndSendMessage(chatId, isFirst) {
     }
   }
 
-  // 引用逻辑
-  if (isFirst && s.dreamQuoteEnabled !== false && userMsgs.length > 0 && Math.random() < 0.15) {
-    const picked = userMsgs[Math.floor(Math.random() * userMsgs.length)];
-    newMsg.quote = { text: picked.type === 'text' ? picked.text : '[图片/表情]', senderName: state.profile.name || '我', msgId: -1, type: picked.type };
-    if (picked.type === 'sticker') newMsg.quote.stickerData = picked.stickerData;
-    if (picked.type === 'image') newMsg.quote.imageData = picked.imageData;
+    // 引用与复读逻辑
+  if (isFirst && userMsgs.length > 0) {
+    let isAdvancedQuoteTriggered = false;
+
+    // 1. 👇 新增：进阶引用（直接复读/截取用户的话，15%概率）
+    if (Math.random() < 0.15) {
+      // 找最近的一条用户纯文字消息
+      const recentTexts = userMsgs.filter(m => m.type === 'text' && m.text.trim().length > 1);
+      if (recentTexts.length > 0) {
+        const pickedMsg = recentTexts[Math.floor(Math.random() * recentTexts.length)];
+        let rawStr = pickedMsg.text.trim();
+        
+        // 进阶版截取逻辑
+        let resultStr = rawStr;
+        if (rawStr.length > 3 && Math.random() < 0.6) {
+          let chars = Array.from(rawStr);
+          let start = Math.floor(Math.random() * (chars.length - 2));
+          let len = 2 + Math.floor(Math.random() * (chars.length - start));
+          resultStr = chars.slice(start, start + len).join('');
+        }
+
+        newMsg.type = 'text';
+        newMsg.text = resultStr;
+        newMsg.quoteAdvanced = true; // 标记为进阶引用
+        
+        // 因为是文字，顺便把情绪和意图重新随机一下（不然复读出来没有标签了）
+        if (s.emotionEnabled !== false) {
+          const emotions = ['开心', '激动', '伤心', '平静', '害羞', '期待', '疲惫', '温柔', '傲娇', '疑惑', '无奈'];
+          newMsg.emotion = emotions[Math.floor(Math.random() * emotions.length)];
+        }
+        if (s.intentEnabled !== false) {
+          const intents = ['不想说话', '想和你聊聊', '逃避话题', '不知道说什么', '词穷了', '喜欢这个话题', '不太感兴趣', '商量一下', '随便说说'];
+          newMsg.intent = intents[Math.floor(Math.random() * intents.length)];
+        }
+
+        isAdvancedQuoteTriggered = true;
+      }
+    } 
+
+    // 2. 👇 原版引用：带引用条的（受开关控制，15%概率）
+    // 只有当进阶引用没触发时，才判断原版引用
+    if (!isAdvancedQuoteTriggered && s.dreamQuoteEnabled !== false && Math.random() < 0.15) {
+      const picked = userMsgs[Math.floor(Math.random() * userMsgs.length)];
+      newMsg.quote = { text: picked.type === 'text' ? picked.text : '[图片/表情]', senderName: state.profile.name || '我', msgId: -1, type: picked.type };
+      if (picked.type === 'sticker') newMsg.quote.stickerData = picked.stickerData;
+      if (picked.type === 'image') newMsg.quote.imageData = picked.imageData;
+    }
   }
 
   msgs.push(newMsg);
@@ -3856,6 +3932,13 @@ function renderMailList() {
   list.innerHTML = filtered.map(m => {
     const t = new Date(m.sentAt);
     const timeStr = `${t.getMonth()+1}/${t.getDate()} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
+
+        // 👇 用户消息被梦角加入字卡库的提示
+    let addedToCardHtml = '';
+    if (isUser && m.addedToCard) {
+      const dreamName = state.dreams.find(d => d.id === state.currentChatId)?.name || '梦角';
+      addedToCardHtml = `<div style="margin-top: 4px; font-size: 10px; color: ${subColor}; font-style: italic;">此句已被 ${dreamName} 添加至字卡库</div>`;
+    }
     
     let statusHtml = '';
     if (m.from === 'user') {
