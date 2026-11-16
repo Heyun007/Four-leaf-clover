@@ -545,21 +545,14 @@ function renderChatMessages() {
         </div>`;
       }
 
-      if (m.reaction) {
+            if (m.reaction) {
         emotionHtml += `<div style="margin-top:4px; font-size:10px; color:rgba(0,0,0,0.4); font-style:italic;">
           ${m.reaction.by} ${m.reaction.type === 'like' ? '赞' : '踩'}了此消息
         </div>`;
       }
 
-    // 👇 确保这两个变量被定义了，否则会报错白屏！
-    let advancedQuoteHtml = '';
-    let addedToCardHtml = '';
-
-    if (m.quoteAdvanced) {
-      const dreamName = state.dreams.find(d => d.id === state.currentChatId)?.name || '梦角';
-      advancedQuoteHtml = `<div style="margin-bottom: 4px; font-size: 10px; color: ${subColor}; font-style: italic;">${dreamName} 引用了你以前说的一句话</div>`;
-    }
-    bubbleContent = `${advancedQuoteHtml}<div class="${textClass}">${m.text}</div>${emotionHtml}`;
+      // 👈 直接使用上面的 advancedQuoteHtml 拼接，不要在这里重新定义！
+      bubbleContent = `${advancedQuoteHtml}<div class="${textClass}">${m.text}</div>${emotionHtml}`;
     }
 
     const sideClass = isUser ? 'bubble-user' : 'bubble-dream';
@@ -3945,13 +3938,6 @@ function renderMailList() {
   list.innerHTML = filtered.map(m => {
     const t = new Date(m.sentAt);
     const timeStr = `${t.getMonth()+1}/${t.getDate()} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
-
-        // 👇 用户消息被梦角加入字卡库的提示
-    let addedToCardHtml = '';
-    if (isUser && m.addedToCard) {
-      const dreamName = state.dreams.find(d => d.id === state.currentChatId)?.name || '梦角';
-      addedToCardHtml = `<div style="margin-top: 4px; font-size: 10px; color: ${subColor}; font-style: italic;">此句已被 ${dreamName} 添加至字卡库</div>`;
-    }
     
     let statusHtml = '';
     if (m.from === 'user') {
@@ -4533,42 +4519,6 @@ function escapeHtml(s) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
-}
-
-// 修复聊天发送与渲染
-function renderGomokuChats() {
-  var list = document.getElementById('gomokuChatList');
-  if (!list) return;
-  if (gomoku.chats.length === 0) {
-    list.innerHTML = '<div style="text-align:center;font-size:12px;color:#bbb;margin-top:20px;">这里可以聊天，退出后自动清空</div>';
-    return;
-  }
-  var userAvatar = state.profile.avatar || `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%23e8e8ed'/%3E%3Ctext x='16' y='20' text-anchor='middle' fill='%2386868b' font-size='12'%3E👤%3C/text%3E%3C/svg%3E`;
-  var defaultDreamAv = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%23ffe0e8'/%3E%3Ctext x='16' y='20' text-anchor='middle' fill='%23d6336c' font-size='12'%3E💜%3C/text%3E%3C/svg%3E`;
-
-  list.innerHTML = gomoku.chats.map(function(c) {
-    if (c.sender === 'system') return `<div style="text-align:center;font-size:11px;color:#999;margin:4px 0;">${c.text}</div>`;
-    var isUser = c.sender === 'user';
-    var avatar = userAvatar;
-    if (!isUser) {
-      if (gomoku.mode === 'spectate' && c.senderId) { 
-        var sd = state.dreams.find(x => x.id === c.senderId); 
-        avatar = sd && sd.avatar ? sd.avatar : defaultDreamAv; 
-      } else { 
-        var d = state.dreams.find(x => x.id === gomoku.dreamId); 
-        avatar = d && d.avatar ? d.avatar : defaultDreamAv; 
-      }
-    }
-    return `<div style="display:flex; justify-content:${isUser ? 'flex-end' : 'flex-start'}; align-items:flex-start; gap:8px; margin-bottom:8px;">
-        ${!isUser ? `<img src="${avatar}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;">` : ''}
-        <div style="max-width:70%; display:flex; flex-direction:column; align-items:${isUser ? 'flex-end' : 'flex-start'};">
-          <!-- 移除了可能导致报错的 escapeHtml 依赖，直接显示文字 -->
-          <div class="gomoku-chat-msg ${isUser ? 'user' : 'dream'}">${c.text || ''}</div>
-        </div>
-        ${isUser ? `<img src="${avatar}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;">` : ''}
-      </div>`;
-  }).join('');
-  list.scrollTop = list.scrollHeight;
 }
 
 // ================= 朋友圈核心逻辑 =================
