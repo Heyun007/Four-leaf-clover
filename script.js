@@ -1381,7 +1381,7 @@ function triggerDreamReply() {
 
   // 3. 已读不回
   const cs = (state.chatSettingsMap || {})[chatIdAtSend] || {};
-  if (cs.readNoReply && Math.random() < 0.1) {
+  if (cs.readNoReply && Math.random() < 0.03) {
     if (typingNameEl) typingNameEl.textContent = dreamName;
     if (typingEl) typingEl.style.display = 'flex';
     const fakeTyping = setTimeout(() => {
@@ -1441,6 +1441,9 @@ function generateAndSendMessage(chatId, isFirst) {
   const msgs = state.chatSessions[chatId] || [];
   const userMsgs = msgs.filter(m => m.from === 'user').slice(-5);
 
+    // 👇 获取所有被屏蔽的分类
+  const blockedCats = (state.categories || []).filter(cat => cat.blocked).map(cat => cat.id);
+
   const usableCards = state.cards.filter(c => 
     (c.dreamId || 'all') === 'all' || c.dreamId === chatId
   ).filter(c => {
@@ -1448,6 +1451,10 @@ function generateAndSendMessage(chatId, isFirst) {
     const trimmed = c.text.trim();
     if (trimmed.length === 0) return false;
     if (/[\u200B-\u200D\uFEFF\uFFFD\u25A0\u25A1\uFFFC]/.test(trimmed)) return false;
+    
+    if (c.blocked) return false; // 👈 核心修复：字卡被屏蔽了，跳过
+    if (c.cat && blockedCats.includes(c.cat)) return false; // 👈 核心修复：所在分类被屏蔽了，跳过
+    
     return true;
   });
 
@@ -1525,8 +1532,8 @@ function generateAndSendMessage(chatId, isFirst) {
       rawText = canSendCard ? usableCards[Math.floor(Math.random() * usableCards.length)].text : '……';
     }
 
-    // 2. 高级打碎重组（受自由断句开关控制，30%概率触发）
-    if (s.cutEnabled !== false && rawText.length > 2 && Math.random() < 0.5) {
+    // 2. 高级打碎重组（受自由分段重组开关控制，30%概率触发）
+    if (s.cutEnabled !== false && rawText.length > 2 && Math.random() < 0.3) {
       let pureChars = Array.from(rawText.replace(/[，,]/g, '')); // 先去掉逗号
       let fragments = [];
       let targetParts = Math.floor(Math.random() * 3) + 2; 
@@ -1553,7 +1560,7 @@ function generateAndSendMessage(chatId, isFirst) {
       rawText = fragments.slice(0, takeCount).join('');
     }
 
-    // 3. 自由添加符号（受新开关控制，75%概率触发）
+    // 3. 自由添加符号（75%概率触发）
     if (s.punctEnabled !== false && Math.random() < 0.75 && rawText.length > 1) {
       let puncts = ['，', '。', '！', '？', '…', '~', ' '];
       let resChars = Array.from(rawText);
@@ -1570,6 +1577,21 @@ function generateAndSendMessage(chatId, isFirst) {
 
     newMsg.text = rawText;
 
+    // 👇 4. 自由断句（只说半句话带渐变，受新开关控制）
+    if (s.trueCutEnabled !== false && newMsg.text.length > 1 && Math.random() < 0.5) {
+      const chars = Array.from(newMsg.text);
+      if (chars.length > 1) {
+        const cutIndex = Math.floor(chars.length * (0.4 + Math.random() * 0.2));
+        const isCutEnd = Math.random() < 0.5;
+        let cutText = isCutEnd ? chars.slice(0, cutIndex).join('') : chars.slice(cutIndex).join('');
+        cutText = cutText.trim();
+        if (cutText.length > 0 && /[^\s\p{P}]/u.test(cutText)) {
+          newMsg.text = cutText;
+          newMsg.cut = isCutEnd ? 'end' : 'start';
+        }
+      }
+    }
+
     // 情绪标签 + 交流意图
     if (s.emotionEnabled !== false) {
       const emotions = ['开心', '激动', '伤心', '平静', '害羞', '期待', '疲惫', '温柔', '傲娇', '疑惑', '无奈'];
@@ -1581,7 +1603,7 @@ function generateAndSendMessage(chatId, isFirst) {
     }
   }
 
-  // 引用逻辑（使用了 isFirst）
+  // 引用逻辑
   if (isFirst && s.dreamQuoteEnabled !== false && userMsgs.length > 0 && Math.random() < 0.15) {
     const picked = userMsgs[Math.floor(Math.random() * userMsgs.length)];
     newMsg.quote = { text: picked.type === 'text' ? picked.text : '[图片/表情]', senderName: state.profile.name || '我', msgId: -1, type: picked.type };
@@ -1636,6 +1658,35 @@ function generateAndSendMessage(chatId, isFirst) {
       }
     }
   }, 1500);
+
+  // 👇 新增：梦角主动撤回消息（10% 概率）
+  if (Math.random() < 0.1) {
+    setTimeout(() => {
+      const msgsList = state.chatSessions[chatId];
+      if (!msgsList) return;
+      const dreamObj = state.dreams.find(d => d.id === chatId);
+      const dreamName = dreamObj ? dreamObj.name : '梦角';
+
+      // 从后往前找，找一条最近发的、没撤回的梦角消息（只撤回文本或表情，不撤卡片）
+      for (let i = msgsList.length - 1; i >= 0; i--) {
+        const m = msgsList[i];
+        if (m.from === 'dream' && !m.recalled && (m.type === 'text' || m.type === 'sticker')) {
+          msgsList[i] = { 
+            from: 'system', 
+            type: 'text', 
+            text: `「${dreamName}」撤回了一条消息`, 
+            time: Date.now() 
+          };
+          saveState();
+          
+          if (state.currentChatId === chatId && document.getElementById('pageChat').classList.contains('active')) {
+            renderChatMessages();
+          }
+          break; 
+        }
+      }
+    }, 3000 + Math.random() * 5000); // 发出来 3~8 秒后撤回
+  }
 
   if (s.pushEnabled && Notification.permission === 'granted') {
     if (!document.hasFocus() || state.currentChatId !== chatId) {
@@ -3477,6 +3528,7 @@ function initChatSettingPage() {
   // 设置 Toggle 状态
   document.getElementById('emotionToggle').classList.toggle('on', s.emotionEnabled !== false);
   document.getElementById('cutToggle').classList.toggle('on', s.cutEnabled !== false);
+  document.getElementById('trueCutToggle').classList.toggle('on', s.trueCutEnabled !== false);
   document.getElementById('punctToggle').classList.toggle('on', s.punctEnabled !== false);
   document.getElementById('intentToggle').classList.toggle('on', s.intentEnabled !== false);
   document.getElementById('cardJoinToggle').classList.toggle('on', !!s.cardJoinEnabled);
@@ -3938,7 +3990,9 @@ function aiReplyLetter(letterId) {
 
   // 从字卡库抽 8-15 句
   const count = 8 + Math.floor(Math.random() * 8);
-  const usableCards = state.cards.filter(c => (c.dreamId || 'all') === 'all' || c.dreamId === dream.id);
+    const usableCards = state.cards.filter(c => 
+    ((c.dreamId || 'all') === 'all' || c.dreamId === dream.id) && !c.blocked
+  );
   if (usableCards.length === 0) return;
 
   const shuffled = [...usableCards].sort(() => Math.random() - 0.5);
@@ -3986,7 +4040,9 @@ function checkAutoLetter() {
   const dream = state.dreams[Math.floor(Math.random() * state.dreams.length)];
 
   const count = 8 + Math.floor(Math.random() * 8);
-  const usableCards = state.cards.filter(c => (c.dreamId || 'all') === 'all' || c.dreamId === dream.id);
+    const usableCards = state.cards.filter(c => 
+    ((c.dreamId || 'all') === 'all' || c.dreamId === dream.id) && !c.blocked
+  );
   if (usableCards.length === 0) return;
   
   const shuffled = [...usableCards].sort(() => Math.random() - 0.5);
@@ -4318,7 +4374,9 @@ function checkAutoDreamSchedule() {
     if (dream.lastScheduleDate === todayStr) return;
     if (Math.random() > 0.3) return;
 
-    const usableCards = state.cards.filter(c => (c.dreamId || 'all') === 'all' || c.dreamId === dream.id);
+      const usableCards = state.cards.filter(c => 
+    ((c.dreamId || 'all') === 'all' || c.dreamId === dream.id) && !c.blocked
+  );
     if (usableCards.length === 0) return;
 
     // 随机抽 1-3 张字卡拼成名字
@@ -4719,7 +4777,9 @@ function triggerAiComment(diaryId) {
   const dream = state.dreams[Math.floor(Math.random() * state.dreams.length)];
   if (!d.comments) d.comments = [];
   
-  const usableCards = state.cards.filter(c => (c.dreamId || 'all') === 'all' || c.dreamId === dream.id);
+    const usableCards = state.cards.filter(c => 
+    ((c.dreamId || 'all') === 'all' || c.dreamId === dream.id) && !c.blocked
+  );
   const text = usableCards.length > 0 ? usableCards[Math.floor(Math.random() * usableCards.length)].text : '……';
 
   d.comments.push({
@@ -4751,7 +4811,9 @@ function checkAutoDiary() {
     if (lastPost && Date.now() - lastPost.time < 6 * 60 * 60 * 1000) return;
     if (Math.random() > 0.3) return; // 30% 概率发
 
-    const usableCards = state.cards.filter(c => (c.dreamId || 'all') === 'all' || c.dreamId === dream.id);
+      const usableCards = state.cards.filter(c => 
+    ((c.dreamId || 'all') === 'all' || c.dreamId === dream.id) && !c.blocked
+  );
     if (usableCards.length === 0) return;
     
     const count = 2 + Math.floor(Math.random() * 4);
@@ -4872,7 +4934,9 @@ function checkAutoCommentOnDiary() {
   // 如果这个梦角已经评论过了，就不评了
   if (diary.comments && diary.comments.some(c => c.authorId === dream.id)) return;
 
-  const usableCards = state.cards.filter(c => (c.dreamId || 'all') === 'all' || c.dreamId === dream.id);
+    const usableCards = state.cards.filter(c => 
+    ((c.dreamId || 'all') === 'all' || c.dreamId === dream.id) && !c.blocked
+  );
   if (usableCards.length === 0) return;
   const text = usableCards[Math.floor(Math.random() * usableCards.length)].text;
 
