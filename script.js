@@ -1418,10 +1418,10 @@ function triggerDreamReply() {
     }
   }
 
-    // 👇 梦角主动将用户的话添加至字卡库（35%概率）
+    // 👇 梦角主动将用户的话添加至字卡库（15%概率）
   const lastUserTextMsg = msgs.filter(m => m.from === 'user' && m.type === 'text').pop();
   if (lastUserTextMsg && lastUserTextMsg.text && lastUserTextMsg.text.length > 1 && lastUserTextMsg.text.length < 50) {
-    if (Math.random() < 0.35 && !lastUserTextMsg.addedToCard) {
+    if (Math.random() < 0.15 && !lastUserTextMsg.addedToCard) {
       const txt = lastUserTextMsg.text.trim();
       // 检查是否已经存在该字卡
       const exists = state.cards.some(c => c.text === txt && (c.dreamId || 'all') === chatIdAtSend);
