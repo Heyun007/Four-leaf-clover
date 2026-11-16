@@ -611,3 +611,7 @@ body {
 .diary-item-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
 .diary-item-time { font-size: 12px; color: #b0b0b5; }
 .diary-item-del { font-size: 12px; color: var(--gray); cursor: pointer; padding: 4px 10px; border-radius: 6px; background: #f5f5f7; }
+
+#lockPasswordInput:focus {
+  border-color: rgba(255, 255, 255, 0.6) !important;
+}
