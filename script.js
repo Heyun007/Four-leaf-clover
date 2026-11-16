@@ -1479,8 +1479,10 @@ function generateAndSendMessage(chatId, isFirst) {
     newMsg.claimed = false;
     
     const pickedGift = userGifts[Math.floor(Math.random() * userGifts.length)];
-    newMsg.giftName = pickedGift.name;
-    newMsg.amount = pickedGift.price;
+        newMsg.giftName = pickedGift.name;
+    // 👇 加上这两行，随机 1-5 份礼物
+    newMsg.count = Math.floor(Math.random() * 5) + 1; 
+    newMsg.amount = pickedGift.price * newMsg.count;
     
   } else if (sendType === 'poke') {
     const dream = state.dreams.find(x => x.id === chatId);
@@ -3516,44 +3518,40 @@ function clearAllData() {
 // ================= 主动找我定时器 =================
 // ================= 跨梦角主动发消息与通知 =================
 function checkAutoMessage() {
-  // 1. 检查是否有开启主动找我
   if (!state.settings || !state.settings.autoMessageDelay) return;
   var threshold = parseInt(state.settings.autoMessageDelay);
   if (!threshold || threshold <= 0) return;
-  
   if (!state.dreams || state.dreams.length === 0) return;
   if (!state.lastActivityAt) state.lastActivityAt = {};
 
   var now = Date.now();
-  
-  // 2. 找出所有达到触发条件的梦角
   var candidates = [];
+  
   state.dreams.forEach(function(d) {
     var lastAt = state.lastActivityAt[d.id] || 0;
-    // 如果没聊过天，或者超过设定时间
     if (now - lastAt >= threshold) candidates.push(d);
   });
   
   if (candidates.length === 0) return;
-
-  // 3. 15% 的概率触发（每 30 秒检查一次，防止刷屏）
   if (Math.random() > 0.15) return;
 
-  // 4. 随机抽一个寂寞的梦角
   var picked = candidates[Math.floor(Math.random() * candidates.length)];
   
-  // 5. 👇 修复报错：直接写正确的字卡过滤逻辑，不再调用不存在的 getUsableCards
   var usableCards = state.cards.filter(function(c) {
     return (c.dreamId || 'all') === 'all' || c.dreamId === picked.id;
   });
   var text = usableCards.length > 0 ? usableCards[Math.floor(Math.random() * usableCards.length)].text : '你在忙吗？';
   
-  // 6. 把消息存入他的聊天记录
+  // 👇 加入随机情绪标签
+  var emotions = ['开心', '激动', '伤心', '平静', '害羞', '期待', '疲惫', '温柔', '傲娇', '疑惑', '无奈'];
+  var randomEmotion = emotions[Math.floor(Math.random() * emotions.length)];
+
   if (!state.chatSessions[picked.id]) state.chatSessions[picked.id] = [];
   state.chatSessions[picked.id].push({
     from: 'dream',
     type: 'text',
     text: text,
+    emotion: randomEmotion, // 👈 情绪标签
     time: now,
     status: 'unread'
   });
@@ -3561,18 +3559,26 @@ function checkAutoMessage() {
   state.lastActivityAt[picked.id] = now;
   saveState();
 
-  // 7. 👇 修复报错：直接刷新正确的聊天界面
   if (state.currentChatId === picked.id && document.getElementById('pageChat').classList.contains('active')) {
     renderChatMessages();
   }
-
-  // 8. 刷新顶部下拉列表
   try { renderAll(); } catch(e){}
 
-  // 9. 弹通知
   var isViewingThisChat = (document.getElementById('pageChat').classList.contains('active') && state.currentChatId === picked.id);
+  
   if (!isViewingThisChat) {
-    sendNotification(picked.name, text);
+    try { sendNotification(picked.name, text); } catch(e){}
+    
+    // 👇 强制调用手机系统原生推送
+    if (state.settings && state.settings.pushEnabled && "Notification" in window && Notification.permission === "granted") {
+      try {
+        new Notification(picked.name, { 
+          body: text, 
+          tag: 'auto-msg-' + picked.id, 
+          icon: picked.avatar || '' 
+        });
+      } catch(e){}
+    }
   }
 }
 
@@ -3878,7 +3884,7 @@ function checkAutoLetter() {
   if (!state.mails) state.mails = [];
 
   // 2% 概率触发
-  if (Math.random() > 0.02) return;
+  if (Math.random() > 0.01) return;
 
   const dream = state.dreams[Math.floor(Math.random() * state.dreams.length)];
 
@@ -5171,30 +5177,42 @@ function toggleLikeDiary(diaryId) {
   const d = state.diaries.find(x => x.id === diaryId);
   if (!d) return;
   if (!d.likes) d.likes = [];
-  
+
   const idx = d.likes.indexOf('user');
-  if (idx > -1) d.likes.splice(idx, 1);
-  else {
-    d.likes.push('user');
-    triggerAiLike(diaryId); // 触发梦角点赞
+  if (idx > -1) {
+    d.likes.splice(idx, 1); // 取消自己的赞
+  } else {
+    d.likes.push('user'); // 自己点赞
+    // 👇 只有当你点赞时，才触发梦角点赞（取消赞不触发）
+    triggerAiLike(diaryId); 
   }
+  
   saveState();
   renderDiaryList();
 }
 
 function triggerAiLike(diaryId) {
   if (!state.dreams || state.dreams.length === 0) return;
+  
+  // 👇 核心修改：你点赞后，梦角只有 60% 的概率会跟着赞
+  if (Math.random() > 0.6) return; 
+
   const dream = state.dreams[Math.floor(Math.random() * state.dreams.length)];
+  
+  // 👇 核心修改：延迟 3 到 15 秒后再赞，不要秒赞
+  const delay = 3000 + Math.random() * 12000; 
+
   setTimeout(() => {
     const d = state.diaries.find(x => x.id === diaryId);
     if (d && d.likes && !d.likes.includes(dream.id)) {
-      d.likes.push(dream.id);
+      d.likes.push(dream.id); // 梦角点赞
       saveState();
-      if (document.getElementById('pageScrapbook').classList.contains('active')) renderDiaryList();
+      if (document.getElementById('pageScrapbook').classList.contains('active')) {
+        renderDiaryList();
+      }
     }
-  }, 1500 + Math.random() * 2000);
+  }, delay);
 }
-
 function openDiaryComment(diaryId) {
   const text = prompt('写下你的评论：');
   if (!text || !text.trim()) return;
@@ -5304,13 +5322,22 @@ function checkAutoDiary() {
       pickedImages = shuffledStickers.slice(0, Math.min(imageCount, shuffledStickers.length));
     }
 
+        // 👇 先在 push 外面把数组和随机结果计算好
+    const moods = ['开心', '难过', '激动', '平静', '疲惫', '想念', '感动', '心慌', '生气', '冷静', '无聊', '焦虑', '兴奋', '害羞', '期待', '幸福', '孤单'];
+    const weathers = ['晴朗', '多云', '小雨', '微风', '中雪', '起雾', '阴天', '中雨', '大雨', '暴雨', '小雪', '大雪', '雾霾', '大风', '冰雹', '彩虹'];
+    const randomMood = moods[Math.floor(Math.random() * moods.length)];
+    const randomWeather = weathers[Math.floor(Math.random() * weathers.length)];
+
+    // 👇 然后再执行 push 塞入数据
     state.diaries.push({
       id: 'diary_' + Date.now() + Math.random().toString(36).slice(2,6),
       authorId: dream.id,
       authorName: dream.name,
       text: text,
-      images: pickedImages, // 👈 放入 0-9 张随机表情包
-      likes: [], mood: '开心', weather: '晴朗',
+      images: pickedImages, 
+      likes: [], 
+      mood: randomMood,       // 👈 填入随机情绪
+      weather: randomWeather, // 👈 填入随机天气
       time: Date.now(),
       comments: []
     });
