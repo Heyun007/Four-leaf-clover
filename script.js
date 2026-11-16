@@ -38,6 +38,8 @@ async function loadState() {
   if (!state.diaries || !Array.isArray(state.diaries)) state.diaries = [];
   if (!state.settings || typeof state.settings !== 'object') state.settings = {};
   if (!state.pokes || !Array.isArray(state.pokes)) state.pokes = ["拍了拍对方", "戳了戳脸颊"];
+  if (!state.nicknameLibrary || !Array.isArray(state.nicknameLibrary)) state.nicknameLibrary = [];
+  if (!state.likedAvatars || !Array.isArray(state.likedAvatars)) state.likedAvatars = [];
 
   // 清理梦角里的脏数据
   state.dreams = state.dreams.filter(d => d !== null && d !== undefined);
@@ -196,6 +198,7 @@ function navigateTo(pageId) {
   if (pageId === 'pageBeautify') initBeautifyPage();
   if (pageId === 'pageChatSettings') initChatSettingsPage();
   if (pageId === 'pageScrapbook') { renderDiaryCover(); renderDiaryList(); }
+  if (pageId === 'pageNickname') renderNicknameLib();
 }
 
 // ================= 渲染全局 =================
@@ -361,20 +364,35 @@ function openChat(id) {
   state.currentChatId = id;
   saveState(); // 记住当前聊天对象
   
+  // 👇 核心：每次切换聊天，重置只渲染最近 50 条
+  window._chatRenderLimit = 50;
+
   dreamDropdown.classList.remove('show');
   navigateTo('pageChat');
   
-  // 这个函数会自动把名字和图片头像渲染到顶部
   renderAll(); 
 }
+
+window._chatRenderLimit = 50; // 全局变量，控制渲染条数
 
 function renderChatMessages() {
   const container = document.getElementById('chatMessageContainer');
   const msgs = state.chatSessions[state.currentChatId] || [];
+  
   if (msgs.length === 0) {
     container.innerHTML = '<div style="text-align:center;color:#999;font-size:13px;margin-top:50px;">开始聊天吧</div>';
     return;
   }
+
+  // 👇 核心防卡顿：只截取最近 N 条进行渲染
+  const limit = window._chatRenderLimit || 50;
+  const startIndex = Math.max(0, msgs.length - limit);
+  const msgsToRender = msgs.slice(startIndex);
+
+  // 记录渲染前的状态，判断你当前是不是在底部
+  const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+  const oldScrollHeight = container.scrollHeight;
+  const oldScrollTop = container.scrollTop;
 
   const dream = state.dreams.find(x => x.id === state.currentChatId);
   const dreamName = dream ? dream.name : '梦';
@@ -389,47 +407,22 @@ function renderChatMessages() {
   const hasCustomCSS = bSet.globalChatCSS && bSet.globalChatCSS.trim().length > 0;
   const subColor = bSet.globalSubTextColor || '#b0b0b0';
 
-    let bubbleClass = '';
-  // 只有当没有自定义 CSS 时，才加载默认的玻璃/手绘风格，防止覆盖你的代码
+  let bubbleClass = '';
   if (!hasCustomCSS) {
     if (bSet.globalBubbleStyle === 'glass') bubbleClass = 'bubble-glass';
     if (bSet.globalBubbleStyle === 'handdrawn') bubbleClass = 'bubble-handdrawn';
   }
 
-  container.innerHTML = msgs.map((m, i) => {
-    if (m.from === 'system') return `<div data-msg-index="${i}" style="text-align:center; margin:12px 0; font-size:12px; color:${subColor};">${m.text}</div>`;
+  container.innerHTML = msgsToRender.map((m, i) => {
+    const realIndex = startIndex + i; // 真实消息索引，用于长按撤回等功能
+
+    if (m.from === 'system') return `<div data-msg-index="${realIndex}" style="text-align:center; margin:12px 0; font-size:12px; color:${subColor};">${m.text}</div>`;
     
     if (m.type === 'poke') {
       const pokeName = m.senderName || (m.from === 'user' ? '我' : dreamName);
-      return `<div data-msg-index="${i}" style="text-align:center; margin:12px 0; font-size:12px; color:${subColor};"><span style="font-weight:600;">${pokeName}</span> ${m.text}</div>`;
+      return `<div data-msg-index="${realIndex}" style="text-align:center; margin:12px 0; font-size:12px; color:${subColor};"><span style="font-weight:600;">${pokeName}</span> ${m.text}</div>`;
     }
 
-    if (m.type === 'gomoku_invite') {
-      const matchNow = state.gomokuAiMatches.find(x => x.id === m.matchId);
-      const isEnded = !matchNow || !matchNow.active;
-      return `<div data-msg-index="${i}" style="display:flex;justify-content:flex-start;margin-bottom:12px;">
-        <div style="width:240px;background:linear-gradient(135deg,#f5f5f7,#e8e8ed);border-radius:12px;padding:16px;box-shadow:0 4px 14px rgba(0,0,0,0.08);border:1px solid rgba(255,255,255,0.7);">
-          <div style="font-size:14px;font-weight:600;color:#1d1d1f;margin-bottom:10px;">对局邀请</div>
-          <div style="font-size:14px;color:#333;line-height:1.5;margin-bottom:12px;">「${m.p1Name}」和「${m.p2Name}」正在五子棋对弈！</div>
-          ${isEnded ? '<div style="text-align:center;font-size:12px;color:#888;padding-top:10px;border-top:1px solid rgba(0,0,0,0.05);">对局已结束</div>' 
-                    : `<button onclick="enterSpectateMode('${m.matchId}')" style="width:100%;padding:8px;border:none;background:#007aff;color:#fff;border-radius:8px;font-size:13px;cursor:pointer;font-weight:600;">去观战</button>`}
-        </div>
-      </div>`;
-    }
-
-    if (m.type === 'gomoku_result') {
-      const p1Col = m.p1Color === 1 ? '黑棋' : '白棋';
-      const p2Col = m.p2Color === 1 ? '黑棋' : '白棋';
-      return `<div data-msg-index="${i}" style="display:flex;justify-content:flex-start;margin-bottom:12px;">
-        <div style="width:240px;background:#fff;border-radius:12px;padding:14px 16px;box-shadow:0 4px 14px rgba(0,0,0,0.08);border:1px solid rgba(0,0,0,0.05);">
-          <div style="font-size:14px;font-weight:600;color:#1d1d1f;margin-bottom:10px;">五子棋战报</div>
-          <div style="font-size:13px;color:#333;margin-bottom:4px;">${m.p1Name}（${p1Col}） vs ${m.p2Name}（${p2Col}）</div>
-          <div style="font-size:12px;color:#007aff;font-weight:600;margin-bottom:8px;">胜者：${m.winnerName}</div>
-        </div>
-      </div>`;
-    }
-
-        // 👇 抉择卡片渲染
     if (m.type === 'choice') {
       const isAnswered = m.answer !== null;
       let optionsHtml = m.options.map(opt => {
@@ -442,7 +435,7 @@ function renderChatMessages() {
         </div>`;
       }).join('');
 
-      return `<div data-msg-index="${i}" style="display:flex; justify-content:flex-end; margin-bottom:12px; width:100%;">
+      return `<div data-msg-index="${realIndex}" style="display:flex; justify-content:flex-end; margin-bottom:12px; width:100%;">
         <div style="width:240px;background:#fff;border-radius:12px;padding:16px;box-shadow:0 4px 14px rgba(0,0,0,0.05);border:1px solid #e5e5ea;">
           <div style="font-size:14px;font-weight:600;color:#1d1d1f;margin-bottom:12px;">📊 抉择</div>
           <div style="font-size:13px;color:#333;margin-bottom:10px;">${m.question}</div>
@@ -452,21 +445,17 @@ function renderChatMessages() {
       </div>`;
     }
 
-
     const isUser = m.from === 'user';
     const avatar = isUser ? userAvatar : dreamAvatar;
     const isSticker = m.type === 'sticker';
     
-    // 👇 完美复刻截图极简 UI：统一处理用户和梦角的红包/礼物卡片
     if (m.type === 'redpacket' || m.type === 'dream_redpacket' || m.type === 'gift' || m.type === 'dream_gift') {
       const isRp = m.type === 'redpacket' || m.type === 'dream_redpacket';
-      
       const amount = isUser ? (isRp ? m.totalAmount : m.totalPrice) : (m.amount || 0);
       const count = m.count || 1;
       const title = isUser ? (isRp ? '我发的红包' : '我送的礼物') : (isRp ? `${dreamName} 发的红包` : `${dreamName} 送的礼物`);
       const msgText = isRp ? (m.message || '大吉大利，恭喜发财') : (m.giftName || '神秘礼物') + ' ×' + count;
 
-      // 纯 SVG 线框图标（无 emoji）
       const iconSvg = isRp 
         ? `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#1d1d1f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>`
         : `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#1d1d1f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"></rect><path d="M12 8v13"></path><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"></path><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"></path></svg>`;
@@ -484,14 +473,12 @@ function renderChatMessages() {
         statusText = m.claimed ? '已领取' : (isRp ? '待领取' : '待收下');
       }
 
-      // 如果已经拒收/领取，就不弹窗
       const clickAction = isUser 
         ? (isRp ? `openRedPacketDetail('${m.packetId}')` : `openGiftDetail('${m.packetId}')`) 
-        : `openClaimDreamPacketModal('${m.packetId}', ${i})`;
+        : `openClaimDreamPacketModal('${m.packetId}', ${realIndex})`;
 
-      return `<div data-msg-index="${i}" style="display:flex; justify-content:${isUser ? 'flex-end' : 'flex-start'}; margin-bottom:16px; width:100%;">
+      return `<div data-msg-index="${realIndex}" style="display:flex; justify-content:${isUser ? 'flex-end' : 'flex-start'}; margin-bottom:16px; width:100%;">
         ${!isUser ? `<img src="${avatar}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin-right: 10px;">` : ''}
-        
         <div onclick="${clickAction}" style="width:210px; background:#f8f8fa; border-radius:12px; padding:14px 16px; cursor:pointer; box-shadow:0 2px 10px rgba(0,0,0,0.02);">
           <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
             ${iconSvg}
@@ -502,12 +489,9 @@ function renderChatMessages() {
              ${!isRp ? `${amount.toFixed(2)} 元 · ` : ''} ${statusText}
           </div>
         </div>
-
         ${isUser ? `<img src="${avatar}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin-left: 10px;">` : ''}
       </div>`;
     }
-
-    // 👇 下面紧跟着的就是 const date = new Date... 不要删这行
     
     const date = new Date(m.time || Date.now());
     const timeStr = String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0');
@@ -533,13 +517,27 @@ function renderChatMessages() {
       if (m.cut === 'end') textClass = 'text-fade-right';
       if (m.cut === 'start') textClass = 'text-fade-left';
       
-      let emotionHtml = '';
+      let tagsHtml = '';
       if (m.emotion && state.settings.emotionEnabled !== false) {
-        emotionHtml = `<div style="margin-top:6px; padding-top:6px; border-top:1px solid rgba(0,0,0,0.06); display:flex; align-items:center; gap:6px; font-size:11px; color:rgba(0,0,0,0.5);">
-          <span style="border:1px solid rgba(0,0,0,0.2); padding:0 4px; border-radius:4px; font-size:10px;">情绪</span>
-          <span style="font-weight:600;">${m.emotion}</span>
+        tagsHtml += `<span style="border:1px solid rgba(0,0,0,0.2); padding:0 4px; border-radius:4px; font-size:10px; margin-right:4px;">情绪</span><span style="font-weight:600; margin-right:10px;">${m.emotion}</span>`;
+      }
+      if (m.intent && state.settings.intentEnabled !== false) {
+        tagsHtml += `<span style="border:1px solid rgba(0,0,0,0.2); padding:0 4px; border-radius:4px; font-size:10px; margin-right:4px;">意图</span><span style="font-weight:600;">${m.intent}</span>`;
+      }
+
+      let emotionHtml = '';
+      if (tagsHtml) {
+        emotionHtml = `<div style="margin-top:6px; padding-top:6px; border-top:1px solid rgba(0,0,0,0.06); display:flex; align-items:center; gap:6px; font-size:11px; color:rgba(0,0,0,0.5); flex-wrap:wrap;">
+          ${tagsHtml}
         </div>`;
       }
+
+      if (m.reaction) {
+        emotionHtml += `<div style="margin-top:4px; font-size:10px; color:rgba(0,0,0,0.4); font-style:italic;">
+          ${m.reaction.by} ${m.reaction.type === 'like' ? '赞' : '踩'}了此消息
+        </div>`;
+      }
+
       bubbleContent = `<div class="${textClass}">${m.text}</div>${emotionHtml}`;
     }
 
@@ -556,11 +554,9 @@ function renderChatMessages() {
       if (!isUser) bubbleStyle += `box-shadow: 0 1px 3px rgba(0,0,0,0.05);`;
     }
 
-        let quoteHtml = '';
+    let quoteHtml = '';
     if (m.quote) {
       let quoteContent = `<span style="color:#666;">${m.quote.senderName || ''}：</span>`;
-      
-      // 👇 新增：根据类型判断是显示文字还是图片
       if (m.quote.type === 'sticker' && m.quote.stickerData) {
         quoteContent += `<img src="${m.quote.stickerData}" style="max-width: 40px; max-height: 40px; vertical-align: middle; border-radius: 4px; margin-left: 4px;">`;
       } else if (m.quote.type === 'image' && m.quote.imageData) {
@@ -568,17 +564,15 @@ function renderChatMessages() {
       } else {
         quoteContent += `<span style="color:#333;">${m.quote.text || ''}</span>`;
       }
-
       quoteHtml = `<div style="font-size: 12px; padding: 6px 8px; margin-bottom: 8px; background: rgba(255,255,255,0.6); border-left: 3px solid #007aff; border-radius: 4px; word-break: break-all; text-align: left; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; align-items: center;">${quoteContent}</div>`;
     }
 
-    // 👇 加上这个大括号闭合，之前就是这里没闭合导致整个 JS 瘫痪
     if (!bubbleContent || (typeof bubbleContent === 'string' && bubbleContent.trim() === '')) {
        return ''; 
     }
 
     return `
-      <div data-msg-index="${i}" style="display: flex; margin-bottom: 16px; justify-content: ${isUser ? 'flex-end' : 'flex-start'}; align-items: flex-start; gap: 10px; width: 100%;">
+      <div data-msg-index="${realIndex}" style="display: flex; margin-bottom: 16px; justify-content: ${isUser ? 'flex-end' : 'flex-start'}; align-items: flex-start; gap: 10px; width: 100%;">
         ${!isUser ? `<img src="${avatar}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0;">` : ''}
         <div style="max-width: 75%; text-align: ${isUser ? 'right' : 'left'};">
           <div class="${isSticker ? '' : 'chat-bubble ' + sideClass + ' ' + bubbleClass}" style="${bubbleStyle}">
@@ -592,9 +586,29 @@ function renderChatMessages() {
         ${isUser ? `<img src="${avatar}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0;">` : ''}
       </div>
     `;
-  }).join(''); // 👈 这里的闭合也修好了
+  }).join('');
   
-  container.scrollTop = container.scrollHeight;
+  // 👇 修复滚动问题：
+  // 如果是刚进聊天，或者有新消息，自动滚到底部（并多次延迟，防止图片加载撑高导致没滚到底）
+  if (isAtBottom || limit === 50) {
+    container.scrollTop = container.scrollHeight;
+    setTimeout(() => { if(container) container.scrollTop = container.scrollHeight; }, 50);
+    setTimeout(() => { if(container) container.scrollTop = container.scrollHeight; }, 200);
+  } else {
+    // 如果是往上拉加载历史，保持原来的视角位置
+    container.scrollTop = oldScrollTop + (container.scrollHeight - oldScrollHeight);
+  }
+
+  // 👇 绑定往上滚动加载更多
+  container.onscroll = null;
+  container.onscroll = function() {
+    // 如果滚动到了最顶部，且还有历史消息没渲染
+    if (container.scrollTop < 10 && msgs.length > limit) {
+      window._chatRenderLimit += 50; // 每次多渲染 50 条
+      renderChatMessages();
+    }
+  };
+
   attachLongPress();
 }
 
@@ -1479,8 +1493,7 @@ function generateAndSendMessage(chatId, isFirst) {
     newMsg.claimed = false;
     
     const pickedGift = userGifts[Math.floor(Math.random() * userGifts.length)];
-        newMsg.giftName = pickedGift.name;
-    // 👇 加上这两行，随机 1-5 份礼物
+    newMsg.giftName = pickedGift.name;
     newMsg.count = Math.floor(Math.random() * 5) + 1; 
     newMsg.amount = pickedGift.price * newMsg.count;
     
@@ -1498,40 +1511,77 @@ function generateAndSendMessage(chatId, isFirst) {
   } else {
     // 纯文字聊天
     newMsg.type = 'text';
+    let rawText = '';
+
+    // 1. 提取字卡
     if (canSendCard && s.cardJoinEnabled) {
       const minN = Math.max(1, Math.min(7, s.cardJoinMin || 1));
       const maxN = Math.max(minN, Math.min(7, s.cardJoinMax || 3));
       let count = minN + Math.floor(Math.random() * (maxN - minN + 1));
       let shuffled = [...usableCards].sort(() => Math.random() - 0.5);
       let picked = shuffled.slice(0, Math.min(count, shuffled.length));
-      newMsg.text = picked.map(c => c.text).join('，');
+      rawText = picked.map(c => c.text).join('，');
     } else {
-      newMsg.text = canSendCard ? usableCards[Math.floor(Math.random() * usableCards.length)].text : '……';
+      rawText = canSendCard ? usableCards[Math.floor(Math.random() * usableCards.length)].text : '……';
     }
 
-    // 断句逻辑
-    if (s.cutEnabled !== false && newMsg.text.length > 1 && Math.random() < 0.5) {
-      const chars = Array.from(newMsg.text);
-      if (chars.length > 1) {
-        const cutIndex = Math.floor(chars.length * (0.4 + Math.random() * 0.2));
-        const isCutEnd = Math.random() < 0.5;
-        let cutText = isCutEnd ? chars.slice(0, cutIndex).join('') : chars.slice(cutIndex).join('');
-        cutText = cutText.trim();
-        if (cutText.length > 0 && /[^\s\p{P}]/u.test(cutText)) {
-          newMsg.text = cutText;
-          newMsg.cut = isCutEnd ? 'end' : 'start';
-        }
+    // 2. 高级打碎重组（受自由断句开关控制，30%概率触发）
+    if (s.cutEnabled !== false && rawText.length > 2 && Math.random() < 0.5) {
+      let pureChars = Array.from(rawText.replace(/[，,]/g, '')); // 先去掉逗号
+      let fragments = [];
+      let targetParts = Math.floor(Math.random() * 3) + 2; 
+      let cutPoints = [];
+      
+      for (let i = 1; i < pureChars.length; i++) {
+        if (Math.random() < 0.35) cutPoints.push(i);
       }
+      while (cutPoints.length < targetParts - 1 && cutPoints.length < pureChars.length - 1) {
+         let p = Math.floor(Math.random() * (pureChars.length - 1)) + 1;
+         if (!cutPoints.includes(p)) cutPoints.push(p);
+      }
+      cutPoints.sort((a,b) => a-b);
+
+      let last = 0;
+      for (let p of cutPoints) {
+        fragments.push(pureChars.slice(last, p).join(''));
+        last = p;
+      }
+      fragments.push(pureChars.slice(last).join(''));
+
+      fragments = fragments.sort(() => Math.random() - 0.5);
+      let takeCount = Math.max(2, Math.floor(Math.random() * fragments.length) + 1);
+      rawText = fragments.slice(0, takeCount).join('');
     }
 
-    // 情绪标签
+    // 3. 自由添加符号（受新开关控制，75%概率触发）
+    if (s.punctEnabled !== false && Math.random() < 0.75 && rawText.length > 1) {
+      let puncts = ['，', '。', '！', '？', '…', '~', ' '];
+      let resChars = Array.from(rawText);
+      let maxInsertions = Math.floor(Math.random() * 3) + 1; 
+      let insertions = Math.floor(Math.random() * Math.min(maxInsertions, resChars.length - 1)) + 1;
+      
+      for (let i = 0; i < insertions; i++) {
+        let pos = Math.floor(Math.random() * (resChars.length - 1)) + 1;
+        let punct = puncts[Math.floor(Math.random() * puncts.length)];
+        resChars.splice(pos, 0, punct);
+      }
+      rawText = resChars.join('');
+    }
+
+    newMsg.text = rawText;
+
+    // 情绪标签 + 交流意图
     if (s.emotionEnabled !== false) {
       const emotions = ['开心', '激动', '伤心', '平静', '害羞', '期待', '疲惫', '温柔', '傲娇', '疑惑', '无奈'];
       newMsg.emotion = emotions[Math.floor(Math.random() * emotions.length)];
     }
+    if (s.intentEnabled !== false) {
+      const intents = ['不想说话', '想和你聊聊', '逃避话题', '不知道说什么', '词穷了', '喜欢这个话题', '不太感兴趣', '商量一下', '随便说说'];
+      newMsg.intent = intents[Math.floor(Math.random() * intents.length)];
+    }
   }
 
-  // 引用逻辑
+  // 引用逻辑（使用了 isFirst）
   if (isFirst && s.dreamQuoteEnabled !== false && userMsgs.length > 0 && Math.random() < 0.15) {
     const picked = userMsgs[Math.floor(Math.random() * userMsgs.length)];
     newMsg.quote = { text: picked.type === 'text' ? picked.text : '[图片/表情]', senderName: state.profile.name || '我', msgId: -1, type: picked.type };
@@ -1546,12 +1596,54 @@ function generateAndSendMessage(chatId, isFirst) {
     renderChatMessages();
   }
 
+  // 👇 赞/踩功能（延迟 1.5 秒）
+  setTimeout(() => {
+    const msgsList = state.chatSessions[chatId];
+    if (!msgsList) return;
+    
+    const dreamObj = state.dreams.find(d => d.id === chatId);
+    const dreamName = dreamObj ? dreamObj.name : '梦角';
+
+    // 1. 赞/踩用户发的消息 (85%概率)
+    if (Math.random() < 0.85) {
+      const userMsgs = msgsList.filter(m => m.from === 'user' && !m.reaction && (m.type === 'text' || m.type === 'sticker' || m.type === 'image'));
+      if (userMsgs.length > 0) {
+        const targetUserMsg = userMsgs[userMsgs.length - 1];
+        targetUserMsg.reaction = {
+          type: Math.random() < 0.8 ? 'like' : 'dislike',
+          by: dreamName
+        };
+        saveState();
+        if (state.currentChatId === chatId && document.getElementById('pageChat').classList.contains('active')) {
+          renderChatMessages();
+        }
+      }
+    }
+
+    // 2. 赞/踩他自己发的消息 (35%概率)
+    if (Math.random() < 0.35) {
+      const dreamMsgs = msgsList.filter(m => m.from === 'dream' && !m.reaction && (m.type === 'text' || m.type === 'sticker'));
+      if (dreamMsgs.length > 0) {
+        const targetDreamMsg = dreamMsgs[dreamMsgs.length - 1];
+        targetDreamMsg.reaction = {
+          type: Math.random() < 0.8 ? 'like' : 'dislike',
+          by: dreamName
+        };
+        saveState();
+        if (state.currentChatId === chatId && document.getElementById('pageChat').classList.contains('active')) {
+          renderChatMessages();
+        }
+      }
+    }
+  }, 1500);
+
   if (s.pushEnabled && Notification.permission === 'granted') {
     if (!document.hasFocus() || state.currentChatId !== chatId) {
       new Notification(state.dreams.find(d=>d.id===chatId)?.name || '梦角', { body: newMsg.type === 'text' ? newMsg.text : '[消息]' });
     }
   }
 }
+
 // ================= 拍一拍功能 =================
 // 初始化词条（如果没数据的话）
 if (!state.pokes) {
@@ -1710,12 +1802,15 @@ function openStats() {
   
   // 遍历聊天记录，统计条数和高频词
   msgs.forEach(m => {
-    if (m.type === 'poke') return; // 排除拍一拍
+    // 👇 核心修复：如果是系统消息，或者拍一拍，直接跳过，不参与任何统计
+    if (m.from === 'system' || m.type === 'poke') return; 
+    
+    // 统计双方消息总数（只统计用户和梦角）
     if (m.from === 'user') userCount++;
     else if (m.from === 'dream') dreamCount++;
     
-    // 只统计纯文字
-    if (m.type === 'text') {
+    // 👇 核心修复：只统计双方发出的纯文字，绝对不统计系统小字
+    if (m.type === 'text' && (m.from === 'user' || m.from === 'dream')) {
       const t = m.text;
       if (t && typeof t === 'string' && t.trim()) {
         textCount[t] = (textCount[t] || 0) + 1;
@@ -3382,6 +3477,8 @@ function initChatSettingPage() {
   // 设置 Toggle 状态
   document.getElementById('emotionToggle').classList.toggle('on', s.emotionEnabled !== false);
   document.getElementById('cutToggle').classList.toggle('on', s.cutEnabled !== false);
+  document.getElementById('punctToggle').classList.toggle('on', s.punctEnabled !== false);
+  document.getElementById('intentToggle').classList.toggle('on', s.intentEnabled !== false);
   document.getElementById('cardJoinToggle').classList.toggle('on', !!s.cardJoinEnabled);
   document.getElementById('dreamQuoteToggle').classList.toggle('on', s.dreamQuoteEnabled !== false);
 
@@ -3543,7 +3640,7 @@ function checkAutoMessage() {
   var text = usableCards.length > 0 ? usableCards[Math.floor(Math.random() * usableCards.length)].text : '你在忙吗？';
   
   // 👇 加入随机情绪标签
-  var emotions = ['开心', '激动', '伤心', '平静', '害羞', '期待', '疲惫', '温柔', '傲娇', '疑惑', '无奈'];
+  var emotions = ['开心', '难过', '激动', '平静', '疲惫', '想念', '感动', '心慌', '生气', '冷静', '无聊', '焦虑', '兴奋', '害羞', '期待', '幸福', '孤单'];
   var randomEmotion = emotions[Math.floor(Math.random() * emotions.length)];
 
   if (!state.chatSessions[picked.id]) state.chatSessions[picked.id] = [];
@@ -4273,665 +4370,6 @@ function checkAutoDreamSchedule() {
 setInterval(checkAutoDreamSchedule, 6 * 60 * 60 * 1000); // 每6小时检查一次
 setTimeout(checkAutoDreamSchedule, 5000); // 启动5秒后查一次
 
-// ================= 五子棋系统核心 =================
-let gomoku = {
-  board: Array(15).fill(0).map(() => Array(15).fill(0)),
-  active: false, dreamId: null, userColor: 1, aiColor: 2, currentTurn: 1, isUserTurn: true,
-  userUndoLeft: 3, aiUndoLeft: 3, moveHistory: [], chats: [],
-  mode: 'pvp', spectateMatchId: null, startTime: null
-};
-
-if (!state.gomokuHistory) state.gomokuHistory = [];
-if (!state.gomokuAiMatches) state.gomokuAiMatches = [];
-
-function openGomokuGame() {
-  // 🚨 进入游戏时，自动清理昨天或卡死超过 20 分钟的对局
-  if (state.gomokuAiMatches) {
-    var now = Date.now();
-    state.gomokuAiMatches.forEach(function(m) {
-      if (m.active && now - m.startTime > 20 * 60 * 1000) {
-        endGomokuAiMatch(m, 'draw');
-      }
-    });
-  }
-  navigateTo('pageGomoku');
-  resetGomokuGame();
-}
-
-function resetGomokuGame() {
-  gomoku.active = false;
-  gomoku.board = Array(15).fill(0).map(() => Array(15).fill(0));
-  gomoku.moveHistory = [];
-  gomoku.chats = [];
-  gomoku.userUndoLeft = 3;
-  gomoku.aiUndoLeft = 3;
-  gomoku.mode = 'pvp';
-  gomoku.spectateMatchId = null;
-  
-  if (Math.random() < 0.5) { gomoku.userColor = 1; gomoku.aiColor = 2; }
-  else { gomoku.userColor = 2; gomoku.aiColor = 1; }
-
-  if (!gomoku.dreamId && state.dreams && state.dreams.length > 0) {
-    gomoku.dreamId = state.dreams[0].id;
-  }
-
-  updateGomokuUI();
-  setTimeout(drawGomokuBoard, 50);
-  renderGomokuChats();
-}
-
-function exitGomoku() {
-  // 如果游戏还在进行中，直接退出算作认输，存个档
-  if (gomoku.active && gomoku.startTime) {
-    saveGomokuHistory('dream', 'resign');
-  }
-  gomoku.chats = []; 
-  gomoku.active = false;
-  gomoku.mode = 'pvp';
-  gomoku.spectateMatchId = null;
-  navigateTo('pageGame');
-}
-
-function updateGomokuUI() {
-  var sideBtns = document.getElementById('gomokuSideBtns');
-  var turnEl = document.getElementById('gomokuTurnIndicator');
-  var overlay = document.getElementById('gomokuStartOverlay');
-  var dreamSelector = document.getElementById('gomokuDreamSelector');
-
-  if (gomoku.mode === 'spectate') {
-    if (sideBtns) sideBtns.style.display = 'none';
-    if (overlay) overlay.style.display = 'none';
-    if (dreamSelector) dreamSelector.style.display = 'none'; 
-    
-    var match = state.gomokuAiMatches.find(m => m.id === gomoku.spectateMatchId);
-    if (match) {
-      var p1ColStr = match.p1Color === 1 ? '⚫黑' : '⚪白';
-      var p2ColStr = match.p2Color === 1 ? '⚫黑' : '⚪白';
-      document.getElementById('gomokuDreamAvatar').src = 'data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2740%27 height=%2740%27 viewBox=%270 0 40 40%27%3E%3Ccircle cx=%2720%27 cy=%2720%27 r=%2720%27 fill=%27%23eee%27/%3E%3C/svg%3E';
-      document.getElementById('gomokuDreamName').textContent = match.p1Name + '(' + p1ColStr + ') vs ' + match.p2Name + '(' + p2ColStr + ')';
-      document.getElementById('gomokuDreamStatus').textContent = '对局观战中';
-      
-      document.getElementById('gomokuUserColor').innerHTML = `${match.p1Name}：${match.p1Color === 1 ? '⚫ 黑棋' : '⚪ 白棋'} &nbsp; | &nbsp; ${match.p2Name}：${match.p2Color === 1 ? '⚫ 黑棋' : '⚪ 白棋'}`;
-      
-      if (match.active) {
-        var currentPlayerName = gomoku.currentTurn === 1 ? (match.p1Color === 1 ? match.p1Name : match.p2Name) : (match.p2Color === 1 ? match.p2Name : match.p1Name);
-        turnEl.textContent = currentPlayerName + ' 思考中...';
-        turnEl.style.color = '#ff9500';
-        turnEl.style.background = 'rgba(255,149,0,0.1)';
-      } else {
-        turnEl.textContent = '对局已结束';
-        turnEl.style.color = '#86868b';
-        turnEl.style.background = '#f0f0f5';
-      }
-    }
-    return; 
-  }
-
-  // PVP 模式
-  if (sideBtns) sideBtns.style.display = 'flex';
-  if (dreamSelector) dreamSelector.style.display = 'flex'; 
-  if (!gomoku.dreamId) return;
-  var d = state.dreams.find(x => x.id === gomoku.dreamId);
-  if (!d) return;
-
-  document.getElementById('gomokuDreamAvatar').src = d.avatar || 'data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2740%27 height=%2740%27 viewBox=%270 0 40 40%27%3E%3Ccircle cx=%2720%27 cy=%2720%27 r=%2720%27 fill=%27%23ffe0e8%27/%3E%3Ctext x=%2720%27 y=%2725%27 text-anchor=%27middle%27 fill=%27%23d6336c%27 font-size=%2716%27%3E💜%3C/text%3E%3C/svg%3E';
-  document.getElementById('gomokuDreamName').textContent = d.name;
-  document.getElementById('gomokuDreamStatus').textContent = d.currentStatus || '在线';
-  
-  var colorDot = gomoku.userColor === 1 ? '⚫' : '⚪';
-  document.getElementById('gomokuUserColor').innerHTML = `我：${colorDot} ${gomoku.userColor === 1 ? '黑棋' : '白棋'} &nbsp; | &nbsp; ${d.name}：${gomoku.aiColor === 1 ? '⚫' : '⚪'} ${gomoku.aiColor === 1 ? '黑棋' : '白棋'}`;
-  document.getElementById('gomokuUndoCount').textContent = gomoku.userUndoLeft;
-
-  if (overlay) {
-    overlay.style.display = gomoku.active ? 'none' : 'flex';
-    document.getElementById('gomokuStartBtn').textContent = gomoku.moveHistory.length > 0 ? '再来一局' : '开始游戏';
-  }
-
-  if (!gomoku.active) {
-    turnEl.textContent = gomoku.moveHistory.length === 0 ? '未开始' : '游戏结束';
-    turnEl.style.color = '#86868b';
-    turnEl.style.background = '#f0f0f5';
-  } else {
-    if (gomoku.isUserTurn) {
-      turnEl.textContent = '你的回合'; turnEl.style.color = 'var(--blue)'; turnEl.style.background = 'rgba(0,122,255,0.1)';
-    } else {
-      turnEl.textContent = d.name + ' 思考中...'; turnEl.style.color = '#ff9500'; turnEl.style.background = 'rgba(255,149,0,0.1)';
-    }
-  }
-}
-
-function startGomokuMatch() {
-  if (!gomoku.dreamId) return showToast('请先选择梦角');
-  
-  if (state.gomokuAiMatches && state.gomokuAiMatches.some(m => m.active && (m.p1Id === gomoku.dreamId || m.p2Id === gomoku.dreamId))) {
-    return showToast('该梦角正在与其他梦角对弈中');
-  }
-
-  gomoku.board = Array(15).fill(0).map(() => Array(15).fill(0));
-  gomoku.moveHistory = [];
-  gomoku.userUndoLeft = 3; gomoku.aiUndoLeft = 3;
-  gomoku.startTime = Date.now(); 
-  
-  if (Math.random() < 0.5) { gomoku.userColor = 1; gomoku.aiColor = 2; }
-  else { gomoku.userColor = 2; gomoku.aiColor = 1; }
-
-  gomoku.active = true;
-  gomoku.currentTurn = 1;
-  gomoku.isUserTurn = (gomoku.userColor === 1);
-  
-  updateGomokuUI();
-  drawGomokuBoard();
-  addGomokuChat('system', `游戏开始！你执${gomoku.userColor === 1 ? '黑' : '白'}，${getDreamName(gomoku.dreamId)}执${gomoku.aiColor === 1 ? '黑' : '白'}。`);
-  
- if (gomoku.aiColor === 1) setTimeout(aiGomokuMove, 800); // 只要梦角执黑（先手），必定触发
-}
-
-function drawGomokuBoard() {
-  var canvas = document.getElementById('gomokuCanvas');
-  if (!canvas) return;
-  var rect = canvas.getBoundingClientRect();
-  if (rect.width === 0) return; 
-
-  var dpr = window.devicePixelRatio || 1;
-  var w = rect.width;
-  canvas.width = w * dpr; canvas.height = w * dpr;
-
-  var ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
-  ctx.clearRect(0, 0, w, w);
-  ctx.fillStyle = '#e6c280';
-  ctx.fillRect(0, 0, w, w);
-
-  var pad = 15, cs = (w - pad * 2) / 14; 
-  ctx.strokeStyle = '#8b6b40'; ctx.lineWidth = 1;
-
-  for (var i = 0; i < 15; i++) {
-    ctx.beginPath(); ctx.moveTo(pad, pad + i * cs); ctx.lineTo(pad + 14 * cs, pad + i * cs); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(pad + i * cs, pad); ctx.lineTo(pad + i * cs, pad + 14 * cs); ctx.stroke();
-  }
-
-  var stars = [[3,3], [11,3], [3,11], [11,11], [7,7]];
-  ctx.fillStyle = '#8b6b40';
-  stars.forEach(function(s) {
-    ctx.beginPath(); ctx.arc(pad + s[0] * cs, pad + s[1] * cs, 3, 0, Math.PI * 2); ctx.fill();
-  });
-
-  for (var y = 0; y < 15; y++) {
-    for (var x = 0; x < 15; x++) {
-      if (gomoku.board[y][x] !== 0) {
-        drawChessPiece(ctx, x, y, gomoku.board[y][x], cs, pad);
-      }
-    }
-  }
-}
-
-function drawChessPiece(ctx, x, y, color, cs, pad) {
-  var cx = pad + x * cs, cy = pad + y * cs, r = cs * 0.42;
-  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  if (color === 1) { 
-    ctx.fillStyle = '#333'; ctx.fill();
-    ctx.beginPath(); ctx.arc(cx - r*0.3, cy - r*0.3, r*0.2, 0, Math.PI*2); ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fill();
-  } else { 
-    ctx.fillStyle = '#f8f8f8'; ctx.fill(); ctx.strokeStyle = '#ccc'; ctx.lineWidth = 1; ctx.stroke();
-    ctx.beginPath(); ctx.arc(cx - r*0.3, cy - r*0.3, r*0.2, 0, Math.PI*2); ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fill();
-  }
-}
-
-document.getElementById('gomokuClickLayer').addEventListener('click', function(e) {
-  if (gomoku.mode === 'spectate' || !gomoku.active || !gomoku.isUserTurn) return;
-  var canvas = document.getElementById('gomokuCanvas');
-  var rect = canvas.getBoundingClientRect();
-  var w = rect.width, pad = 15, cs = (w - pad * 2) / 14;
-  var gx = Math.round((e.clientX - rect.left - pad) / cs);
-  var gy = Math.round((e.clientY - rect.top - pad) / cs);
-  
-  if (gx >= 0 && gx < 15 && gy >= 0 && gy < 15 && gomoku.board[gy][gx] === 0) {
-    makeGomokuMove(gx, gy, gomoku.userColor, true);
-  }
-});
-
-function checkGomokuWin(x, y, color) {
-  var dirs = [[1,0], [0,1], [1,1], [1,-1]];
-  for (var i = 0; i < dirs.length; i++) {
-    var count = 1;
-    for (var j = 1; j < 5; j++) { var nx = x + dirs[i][0] * j, ny = y + dirs[i][1] * j; if (nx >= 0 && nx < 15 && ny >= 0 && ny < 15 && gomoku.board[ny][nx] === color) count++; else break; }
-    for (var j = 1; j < 5; j++) { var nx = x - dirs[i][0] * j, ny = y - dirs[i][1] * j; if (nx >= 0 && nx < 15 && ny >= 0 && ny < 15 && gomoku.board[ny][nx] === color) count++; else break; }
-    if (count >= 5) return true;
-  }
-  return false;
-}
-
-function makeGomokuMove(x, y, color, isUser) {
-  gomoku.board[y][x] = color;
-  gomoku.moveHistory.push({x: x, y: y, color: color});
-  drawGomokuBoard();
-
-  if (checkGomokuWin(x, y, color)) {
-    gomoku.active = false; updateGomokuUI();
-    if (color === gomoku.userColor) { addGomokuChat('system', `🎉 你赢了！`); saveGomokuHistory('user', 'five'); }
-    else { addGomokuChat('system', `💀 ${getDreamName(gomoku.dreamId)} 赢了！`); saveGomokuHistory('dream', 'five'); }
-    return;
-  }
-
-  if (gomoku.moveHistory.length >= 225) {
-    gomoku.active = false; updateGomokuUI();
-    addGomokuChat('system', `平局！棋盘满了。`);
-    saveGomokuHistory('draw', 'full');
-    return;
-  }
-
-  gomoku.currentTurn = color === 1 ? 2 : 1;
-  gomoku.isUserTurn = (gomoku.currentTurn === gomoku.userColor);
-  updateGomokuUI();
-
-  if (!gomoku.isUserTurn && gomoku.active) setTimeout(aiGomokuMove, 800 + Math.random() * 500);
-}
-
-function userUndo() {
-  if (!gomoku.active) return showToast('游戏未开始');
-  if (gomoku.userUndoLeft <= 0) return showToast('悔棋次数用完了');
-  if (gomoku.moveHistory.length < 2) return showToast('还没下几步呢');
-
-  var lastMove1 = gomoku.moveHistory.pop(); gomoku.board[lastMove1.y][lastMove1.x] = 0;
-  var lastMove2 = gomoku.moveHistory.pop(); gomoku.board[lastMove2.y][lastMove2.x] = 0;
-
-  gomoku.userUndoLeft--; gomoku.isUserTurn = true; gomoku.currentTurn = gomoku.userColor;
-  updateGomokuUI(); drawGomokuBoard(); showToast('悔棋成功');
-}
-
-function userResign() {
-  if (!gomoku.active) return;
-  if (!confirm('确定要认输吗？')) return;
-  gomoku.active = false; updateGomokuUI();
-  addGomokuChat('system', `你认输了，${getDreamName(gomoku.dreamId)} 获得胜利。`);
-  saveGomokuHistory('dream', 'resign');
-}
-
-function aiGomokuMove(isUndoAction) {
-  if (!gomoku.active) return;
-// 直接判断当前回合颜色，是不是 AI 的颜色，如果不是，直接退出
-if (gomoku.currentTurn !== gomoku.aiColor) return;
-  if (Math.random() < 0.01) {
-    gomoku.active = false; updateGomokuUI();
-    addGomokuChat('system', `${getDreamName(gomoku.dreamId)} 认输了！你赢了！`);
-    saveGomokuHistory('user', 'resign'); return;
-  }
-
-  if (!isUndoAction && Math.random() < 0.05 && gomoku.aiUndoLeft > 0 && gomoku.moveHistory.length >= 3) {
-    var lastMove1 = gomoku.moveHistory.pop(); gomoku.board[lastMove1.y][lastMove1.x] = 0;
-    var lastMove2 = gomoku.moveHistory.pop(); gomoku.board[lastMove2.y][lastMove2.x] = 0;
-    gomoku.aiUndoLeft--; updateGomokuUI(); drawGomokuBoard();
-    addGomokuChat('dream', `哎呀，下错了，我悔个棋~`);
-    window._gomokuForbiddenMove = { x: lastMove1.x, y: lastMove1.y };
-    setTimeout(function() { aiGomokuMove(true); }, 1000); return;
-  }
-
-  var maxMyScore = -1, maxEnemyScore = -1, bestMyMoves = [], bestEnemyMoves = [];
-
-  for (var y = 0; y < 15; y++) {
-    for (var x = 0; x < 15; x++) {
-      if (gomoku.board[y][x] === 0) {
-        if (isUndoAction && window._gomokuForbiddenMove && x === window._gomokuForbiddenMove.x && y === window._gomokuForbiddenMove.y) continue;
-        var myScore = evaluateGomokuPoint(x, y, gomoku.aiColor);
-        var enemyScore = evaluateGomokuPoint(x, y, gomoku.userColor);
-        if (myScore > maxMyScore) { maxMyScore = myScore; bestMyMoves = [{x, y}]; } else if (myScore === maxMyScore) bestMyMoves.push({x, y});
-        if (enemyScore > maxEnemyScore) { maxEnemyScore = enemyScore; bestEnemyMoves = [{x, y}]; } else if (enemyScore === maxEnemyScore) bestEnemyMoves.push({x, y});
-      }
-    }
-  }
-
-  var move = null;
-  if (maxMyScore >= 10000000) move = bestMyMoves[Math.floor(Math.random() * bestMyMoves.length)];
-  else if (maxEnemyScore >= 10000000) move = bestEnemyMoves[Math.floor(Math.random() * bestEnemyMoves.length)];
-  else if (maxMyScore >= 1000000) move = bestMyMoves[Math.floor(Math.random() * bestMyMoves.length)];
-  else if (maxEnemyScore >= 1000000) move = bestEnemyMoves[Math.floor(Math.random() * bestEnemyMoves.length)];
-  else {
-    var bestScore = -1, bestMoves = [];
-    for (var y = 0; y < 15; y++) {
-      for (var x = 0; x < 15; x++) {
-        if (gomoku.board[y][x] === 0) {
-          if (isUndoAction && window._gomokuForbiddenMove && x === window._gomokuForbiddenMove.x && y === window._gomokuForbiddenMove.y) continue;
-          var score = evaluateGomokuPoint(x, y, gomoku.aiColor) + evaluateGomokuPoint(x, y, gomoku.userColor) * 0.9 + Math.random() * 0.1;
-          if (score > bestScore) { bestScore = score; bestMoves = [{x, y}]; } else if (score === bestScore) bestMoves.push({x, y});
-        }
-      }
-    }
-    if (bestMoves.length > 0) move = bestMoves[Math.floor(Math.random() * bestMoves.length)];
-    else { window._gomokuForbiddenMove = null; aiGomokuMove(true); return; }
-  }
-
-  if (move) {
-    window._gomokuForbiddenMove = null;
-    makeGomokuMove(move.x, move.y, gomoku.aiColor, false);
-  }
-}
-
-function evaluateGomokuPoint(x, y, color) {
-  var score = 0, dirs = [[1,0], [0,1], [1,1], [1,-1]];
-  for (var i = 0; i < 4; i++) {
-    var count = 1, block1 = 0, block2 = 0;
-    for (var j = 1; j < 5; j++) { var nx = x + dirs[i][0] * j, ny = y + dirs[i][1] * j; if (nx < 0 || nx >= 15 || ny < 0 || ny >= 15) { block1 = 1; break; } if (gomoku.board[ny][nx] === color) count++; else if (gomoku.board[ny][nx] === 0) break; else { block1 = 1; break; } }
-    for (var j = 1; j < 5; j++) { var nx = x - dirs[i][0] * j, ny = y - dirs[i][1] * j; if (nx < 0 || nx >= 15 || ny < 0 || ny >= 15) { block2 = 1; break; } if (gomoku.board[ny][nx] === color) count++; else if (gomoku.board[ny][nx] === 0) break; else { block2 = 1; break; } }
-    var blocks = block1 + block2;
-    if (count >= 5) score += 10000000; 
-    else if (count === 4) { if (blocks === 0) score += 1000000; else if (blocks === 1) score += 100000; }
-    else if (count === 3) { if (blocks === 0) score += 8000; else if (blocks === 1) score += 1000; }
-    else if (count === 2) { if (blocks === 0) score += 500; else if (blocks === 1) score += 100; }
-    else if (count === 1) { if (blocks === 0) score += 10; }
-  }
-  return score;
-}
-
-// 新增：用于后台对弈的独立算分函数
-function evaluateGomokuPointBoard(board, x, y, color) {
-  var score = 0, dirs = [[1,0], [0,1], [1,1], [1,-1]];
-  for (var i = 0; i < 4; i++) {
-    var count = 1, block1 = 0, block2 = 0;
-    for (var j = 1; j < 5; j++) { 
-      var nx = x + dirs[i][0] * j, ny = y + dirs[i][1] * j; 
-      if (nx < 0 || nx >= 15 || ny < 0 || ny >= 15) { block1 = 1; break; } 
-      if (board[ny][nx] === color) count++; else if (board[ny][nx] === 0) break; else { block1 = 1; break; } 
-    }
-    for (var j = 1; j < 5; j++) { 
-      var nx = x - dirs[i][0] * j, ny = y - dirs[i][1] * j; 
-      if (nx < 0 || nx >= 15 || ny < 0 || ny >= 15) { block2 = 1; break; } 
-      if (board[ny][nx] === color) count++; else if (board[ny][nx] === 0) break; else { block2 = 1; break; } 
-    }
-    var blocks = block1 + block2;
-    if (count >= 5) score += 10000000; 
-    else if (count === 4) { if (blocks === 0) score += 1000000; else if (blocks === 1) score += 100000; }
-    else if (count === 3) { if (blocks === 0) score += 8000; else if (blocks === 1) score += 1000; }
-    else if (count === 2) { if (blocks === 0) score += 500; else if (blocks === 1) score += 100; }
-    else if (count === 1) { if (blocks === 0) score += 10; }
-  }
-  return score;
-}
-
-function addGomokuChat(sender, text, senderId) { gomoku.chats.push({sender, text, senderId}); renderGomokuChats(); }
-
-function renderGomokuChats() {
-  var list = document.getElementById('gomokuChatList');
-  if (!list) return;
-  if (gomoku.chats.length === 0) {
-    list.innerHTML = '<div style="text-align:center;font-size:12px;color:#bbb;margin-top:20px;">这里可以聊天，退出后自动清空</div>';
-    return;
-  }
-  var userAvatar = state.profile.avatar || `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%23e8e8ed'/%3E%3Ctext x='16' y='20' text-anchor='middle' fill='%2386868b' font-size='12'%3E👤%3C/text%3E%3C/svg%3E`;
-  var defaultDreamAv = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%23ffe0e8'/%3E%3Ctext x='16' y='20' text-anchor='middle' fill='%23d6336c' font-size='12'%3E💜%3C/text%3E%3C/svg%3E`;
-
-  list.innerHTML = gomoku.chats.map(function(c) {
-    if (c.sender === 'system') return `<div style="text-align:center;font-size:11px;color:#999;margin:4px 0;">${c.text}</div>`;
-    var isUser = c.sender === 'user';
-    var avatar = userAvatar;
-    if (!isUser) {
-      if (gomoku.mode === 'spectate' && c.senderId) { var sd = state.dreams.find(x => x.id === c.senderId); avatar = sd && sd.avatar ? sd.avatar : defaultDreamAv; } 
-      else { var d = state.dreams.find(x => x.id === gomoku.dreamId); avatar = d && d.avatar ? d.avatar : defaultDreamAv; }
-    }
-    return `<div style="display:flex; justify-content:${isUser ? 'flex-end' : 'flex-start'}; align-items:flex-start; gap:8px; margin-bottom:8px;">
-        ${!isUser ? `<img src="${avatar}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;">` : ''}
-        <div style="max-width:70%; display:flex; flex-direction:column; align-items:${isUser ? 'flex-end' : 'flex-start'};">
-          <div class="gomoku-chat-msg ${isUser ? 'user' : 'dream'}">${escapeHtml(c.text)}</div>
-        </div>
-        ${isUser ? `<img src="${avatar}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;">` : ''}
-      </div>`;
-  }).join('');
-  list.scrollTop = list.scrollHeight;
-}
-
-function sendGomokuChat() {
-  if (!gomoku.dreamId && gomoku.mode !== 'spectate') return showToast('请先选择梦角');
-  var input = document.getElementById('gomokuChatInput');
-  var text = input.value.trim();
-  if (!text) return;
-  addGomokuChat('user', text); input.value = '';
-  
-  setTimeout(function() {
-    var reply = '嗯嗯，专心下棋吧~', replySenderId = null, targetDreamId = null;
-    if (gomoku.mode === 'spectate') {
-      var match = state.gomokuAiMatches.find(m => m.id === gomoku.spectateMatchId);
-      if (match) { if (Math.random() < 0.5) targetDreamId = match.p1Id; else targetDreamId = match.p2Id; replySenderId = targetDreamId; }
-    } else targetDreamId = gomoku.dreamId;
-
-    if (!targetDreamId) return;
-    var usableCards = state.cards.filter(c => (c.dreamId || 'all') === 'all' || c.dreamId === targetDreamId);
-    if (usableCards.length > 0) reply = usableCards[Math.floor(Math.random() * usableCards.length)].text;
-    else { var gameReplies = ['该你啦！', '别发呆哦', '这局我要赢', '哎呀，好险', '嘿嘿，看招！']; reply = gameReplies[Math.floor(Math.random() * gameReplies.length)]; }
-    addGomokuChat('dream', reply, replySenderId);
-  }, 1000 + Math.random() * 1500);
-}
-
-function toggleGomokuDreamPicker(e) {
-  if (e) e.stopPropagation();
-  if (gomoku.active) return showToast('对局中不能换人哦');
-  var dd = document.getElementById('gomokuDreamDropdown');
-  var list = document.getElementById('gomokuDreamDropdownList');
-  if (dd.style.display === 'none' || dd.style.display === '') {
-    list.innerHTML = state.dreams.map(function(d) {
-      var isActive = d.id === gomoku.dreamId;
-      var avatarSrc = d.avatar || `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36' viewBox='0 0 36 36'%3E%3Ccircle cx='18' cy='18' r='18' fill='%23dff0ff'/%3E%3Ctext x='18' y='23' text-anchor='middle' fill='%23007aff' font-size='14'%3E💜%3C/text%3E%3C/svg%3E`;
-      return `<div onclick="selectGomokuDream('${d.id}', event)" style="display:flex; align-items:center; padding:12px; border-bottom:1px solid #e5e5ea; cursor:pointer; ${isActive ? 'background:#f5f5f7;' : ''}">
-        <img src="${avatarSrc}" style="width:36px; height:36px; border-radius:50%; object-fit:cover; margin-right:10px;">
-        <div style="flex:1;"><div style="font-size:14px; font-weight:600; color:#1d1d1f;">${d.name}</div></div>
-        ${isActive ? '<span style="color:var(--blue);">✓</span>' : ''}
-      </div>`;
-    }).join('');
-    dd.style.display = 'block';
-  }
-}
-
-function selectGomokuDream(id, e) { if (e) e.stopPropagation(); gomoku.dreamId = id; document.getElementById('gomokuDreamDropdown').style.display = 'none'; resetGomokuGame(); }
-
-document.addEventListener('click', function(e) {
-  var dd = document.getElementById('gomokuDreamDropdown');
-  var sel = document.getElementById('gomokuDreamSelector');
-  if (dd && dd.style.display === 'block' && sel && !sel.contains(e.target) && !dd.contains(e.target)) dd.style.display = 'none';
-});
-
-// ===== 五子棋历史记录 =====
-function saveGomokuHistory(winner, reason) {
-  // 如果没有开局时间，说明没开始下，不记录
-  if (!gomoku.startTime) return;
-  
-  var dream = state.dreams.find(x => x.id === gomoku.dreamId);
-  
-  // 确保历史数组存在
-  if (!state.gomokuHistory) state.gomokuHistory = [];
-  
-  state.gomokuHistory.push({
-    id: 'gh_' + Date.now() + Math.random().toString(36).slice(2, 6),
-    startTime: gomoku.startTime, 
-    endTime: Date.now(),
-    duration: Math.floor((Date.now() - gomoku.startTime) / 1000),
-    dreamId: gomoku.dreamId, 
-    dreamName: dream ? dream.name : '未知', 
-    dreamAvatar: dream ? dream.avatar : '',
-    userColor: gomoku.userColor, 
-    winner: winner, 
-    reason: reason
-  });
-  
-  saveState(); 
-  gomoku.startTime = null; 
-}
-
-function openGomokuHistory() { renderGomokuHistoryList(); navigateTo('pageGomokuHistory'); }
-
-function renderGomokuHistoryList() {
-  var container = document.getElementById('gomokuHistoryList');
-  if (!container) return;
-  if (!state.gomokuHistory || state.gomokuHistory.length === 0) {
-    container.innerHTML = '<div style="text-align:center; color:#999; padding:40px; font-size:14px;">还没有对弈记录哦</div>';
-    return;
-  }
-  
-  var sorted = state.gomokuHistory.slice().sort((a, b) => b.endTime - a.endTime);
-  
-  container.innerHTML = sorted.map(function(r) {
-    var t = new Date(r.startTime), 
-        timeStr = `${t.getMonth()+1}月${t.getDate()}日 ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
-    var durationStr = r.duration > 60 ? `${Math.floor(r.duration/60)}分${r.duration%60}秒` : `${r.duration}秒`;
-    
-    // 判断是不是梦角对局
-    var isAiMatch = (r.userColor === 0 || r.winner === 'ai'); 
-    
-    var titleStr = '', resultStr = '', resultColor = '', colorInfoStr = '';
-
-    if (isAiMatch) {
-      // 👇 兜底修复：如果名字是 undefined，就从原字符串里切，或者给默认值
-      var p1Name = r.p1Name || (r.dreamName ? r.dreamName.split(' vs ')[0] : '梦角');
-      var p2Name = r.p2Name || (r.dreamName ? r.dreamName.split(' vs ')[1] : '梦角');
-      var p1Color = r.p1Color === 1 ? '黑' : (r.p1Color === 2 ? '白' : '黑');
-      var p2Color = r.p2Color === 1 ? '黑' : (r.p2Color === 2 ? '白' : '白');
-
-      titleStr = `${p1Name} vs ${p2Name}的对局`;
-      if (r.winner === 'draw') {
-        resultStr = '平局';
-        resultColor = '#86868b';
-      } else {
-        resultStr = `${r.winnerName || '梦角'} 获胜`;
-        resultColor = '#007aff'; 
-      }
-      colorInfoStr = `${p1Name}执${p1Color}，${p2Name}执${p2Color}`;
-    } else {
-      titleStr = `和 ${r.dreamName || '梦角'} 的对局`;
-      if (r.winner === 'user') { 
-        resultStr = r.reason === 'resign' ? '对方认输，你赢了' : '你赢了'; 
-        resultColor = '#34c759'; 
-      } else if (r.winner === 'dream') { 
-        resultStr = r.reason === 'resign' ? '你认输了' : (r.dreamName || '梦角') + ' 赢了'; 
-        resultColor = '#ff3b30'; 
-      } else { 
-        resultStr = '平局'; 
-        resultColor = '#86868b'; 
-      }
-      colorInfoStr = `我执${r.userColor === 1 ? '黑' : '白'}，${r.dreamName || '梦角'}执${r.userColor === 1 ? '白' : '黑'}`;
-    }
-
-    // 👇 去掉了左侧头像，直接把文字撑满整个卡片，跟你的图1一模一样
-    return `<div style="display:flex; flex-direction:column; gap:8px; padding:16px; background:#fff; border-radius:12px; margin-bottom:10px; border:1px solid #e5e5ea;">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <span style="font-size:15px; font-weight:600; color:#1d1d1f;">${titleStr}</span>
-        <span style="font-size:13px; color:${resultColor}; font-weight:600;">${resultStr}</span>
-      </div>
-      <div style="font-size:12px; color:#86868b; display:flex; gap:12px;">
-        <span>🕒 ${timeStr}</span>
-        <span>⏱️ 耗时 ${durationStr}</span>
-      </div>
-      <div style="font-size:12px; color:#999;">
-        ${colorInfoStr}
-      </div>
-    </div>`;
-  }).join('');
-}
-
-// ===== 观战与 AI 后台对弈 =====
-window._spectateSelectedIds = [];
-function startSpectateMatch() {
-  if (!state.dreams || state.dreams.length < 2) return showToast('至少需要两个梦角');
-  // 🚨 清理过期对局
-  if (state.gomokuAiMatches) {
-    var now = Date.now();
-    state.gomokuAiMatches.forEach(function(m) {
-      if (m.active && now - m.startTime > 20 * 60 * 1000) {
-        endGomokuAiMatch(m, 'draw');
-      }
-    });
-  }
-
-  var activeMatch = state.gomokuAiMatches.find(m => m.active);
-  if (activeMatch) {
-    if (confirm('当前有正在进行的梦角对局，是否直接进入观战？')) { enterSpectateMode(activeMatch.id); return; }
-  }
-  var activeMatch = state.gomokuAiMatches.find(m => m.active);
-  if (activeMatch) {
-    if (confirm('当前有正在进行的梦角对局，是否直接进入观战？')) { enterSpectateMode(activeMatch.id); return; }
-  }
-  window._spectateSelectedIds = [];
-  renderSpectateDreamPicker();
-  document.getElementById('spectateDreamPickerModal').style.display = 'flex';
-}
-
-function renderSpectateDreamPicker() {
-  var list = document.getElementById('spectateDreamPickerList');
-  var btn = document.getElementById('spectateStartBtn');
-  if (!list || !btn) return;
-  list.innerHTML = state.dreams.map(function(d) {
-    var isSelected = window._spectateSelectedIds.indexOf(d.id) > -1;
-    var avatarSrc = d.avatar || `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36' viewBox='0 0 36 36'%3E%3Ccircle cx='18' cy='18' r='18' fill='%23dff0ff'/%3E%3Ctext x='18' y='23' text-anchor='middle' fill='%23007aff' font-size='14'%3E💜%3C/text%3E%3C/svg%3E`;
-    return `<div onclick="toggleSpectateDream('${d.id}')" style="display:flex; align-items:center; padding:12px; border-radius:12px; border:1px solid ${isSelected ? 'var(--blue)' : '#e5e5ea'}; background:${isSelected ? 'rgba(0,122,255,0.05)' : 'transparent'}; cursor:pointer; transition:all 0.2s;">
-      <img src="${avatarSrc}" style="width:36px; height:36px; border-radius:50%; object-fit:cover; margin-right:12px;">
-      <span style="flex:1; font-size:15px; font-weight:${isSelected ? '600' : '400'}; color:#1d1d1f;">${d.name}</span>
-      <div style="width:20px; height:20px; border-radius:50%; border:2px solid ${isSelected ? 'var(--blue)' : '#ccc'}; display:flex; justify-content:center; align-items:center; background:${isSelected ? 'var(--blue)' : 'transparent'};">
-        ${isSelected ? '<span style="color:#fff; font-size:12px;">✓</span>' : ''}
-      </div>
-    </div>`;
-  }).join('');
-  if (window._spectateSelectedIds.length === 2) { btn.disabled = false; btn.style.opacity = '1'; }
-  else { btn.disabled = true; btn.style.opacity = '0.5'; }
-}
-
-function toggleSpectateDream(id) {
-  var idx = window._spectateSelectedIds.indexOf(id);
-  if (idx > -1) window._spectateSelectedIds.splice(idx, 1);
-  else { if (window._spectateSelectedIds.length >= 2) window._spectateSelectedIds.shift(); window._spectateSelectedIds.push(id); }
-  renderSpectateDreamPicker();
-}
-
-function closeSpectateDreamPicker() { document.getElementById('spectateDreamPickerModal').style.display = 'none'; }
-
-function confirmSpectateMatch() {
-  if (window._spectateSelectedIds.length !== 2) return;
-  var d1 = state.dreams.find(x => x.id === window._spectateSelectedIds[0]);
-  var d2 = state.dreams.find(x => x.id === window._spectateSelectedIds[1]);
-  if (!d1 || !d2) return showToast('梦角不存在');
-  if (d1.id === d2.id) return showToast('不能选择同一个人');
-  var isBusy = state.gomokuAiMatches && state.gomokuAiMatches.some(m => m.active && (m.p1Id === d1.id || m.p2Id === d1.id || m.p1Id === d2.id || m.p2Id === d2.id));
-  if (isBusy) return showToast('其中一名梦角正在其他对局中');
-  closeSpectateDreamPicker();
-  createGomokuAiMatch(d1, d2, null);
-}
-
-function enterSpectateMode(matchId) {
-  var match = state.gomokuAiMatches.find(m => m.id === matchId);
-  if (!match) return showToast('对局已结束或不存在');
-  
-  gomoku.mode = 'spectate'; 
-  gomoku.spectateMatchId = matchId;
-  gomoku.board = match.board; 
-  gomoku.currentTurn = match.turnColor;
-  
-  navigateTo('pageGomoku'); 
-  updateGomokuUI();
-  setTimeout(drawGomokuBoard, 50); 
-  renderGomokuChats();
-
-  // 👇 核心修复：如果你重新进入，且对局还没结束，手动重新启动思考引擎！
-  if (match.active) {
-    // 清理可能卡死的旧定时器
-    if (window._aiMatchTimers[matchId]) {
-      clearTimeout(window._aiMatchTimers[matchId]);
-      delete window._aiMatchTimers[matchId];
-    }
-    // 重新启动
-    setTimeout(() => {
-      if (state.gomokuAiMatches.some(m => m.id === matchId && m.active)) {
-        runAiMatchEngine(matchId);
-      }
-    }, 1000);
-  }
-}
-
-function checkGomokuWinBoard(board, x, y, color) {
-  var dirs = [[1,0], [0,1], [1,1], [1,-1]];
-  for (var i = 0; i < 4; i++) {
-    var count = 1;
-    for (var j = 1; j < 5; j++) { var nx = x + dirs[i][0] * j, ny = y + dirs[i][1] * j; if (nx >= 0 && nx < 15 && ny >= 0 && ny < 15 && board[ny][nx] === color) count++; else break; }
-    for (var j = 1; j < 5; j++) { var nx = x - dirs[i][0] * j, ny = y - dirs[i][1] * j; if (nx >= 0 && nx < 15 && ny >= 0 && ny < 15 && board[ny][nx] === color) count++; else break; }
-    if (count >= 5) return true;
-  }
-  return false;
-}
-
 // ================= 补齐防注入工具函数 =================
 function escapeHtml(s) {
   if (s == null) return '';
@@ -5036,6 +4474,21 @@ function renderDiaryList() {
       const dreamObj = state.dreams.find(x => x.id === d.authorId);
       if (dreamObj && dreamObj.avatar) realAvatar = dreamObj.avatar;
       else realAvatar = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='44' viewBox='0 0 44 44'%3E%3Ccircle cx='22' cy='22' r='22' fill='%23ffe0e8'/%3E%3Ctext x='22' y='27' text-anchor='middle' fill='%23d6336c' font-size='18'%3E💜%3C/text%3E%3C/svg%3E`;
+    }
+
+        // 👇 如果这条朋友圈已被删除
+    if (d.deleted) {
+      const authorName = d.authorId === 'user' ? (state.profile.name || '我') : (state.dreams.find(x => x.id === d.authorId)?.name || d.authorName);
+      return `<div class="diary-item" style="opacity: 0.6;">
+        <img class="diary-item-avatar" src="${realAvatar}">
+        <div class="diary-item-body">
+          <div class="diary-item-name">${authorName}</div>
+          <div style="font-size:14px; color:#999; padding:16px 0; text-align:center; font-style:italic;">此朋友圈已被 ${authorName} 删除</div>
+          <div class="diary-item-foot">
+             <span class="diary-item-time">${timeStr}</span>
+          </div>
+        </div>
+      </div>`;
     }
 
     let imagesHtml = '';
@@ -5294,41 +4747,31 @@ function checkAutoDiary() {
 
   state.dreams.forEach(dream => {
     // 6小时内最多发一次
-    const lastPost = state.diaries.filter(d => d.authorId === dream.id).sort((a,b) => b.time - a.time)[0];
+    const lastPost = state.diaries.filter(d => d.authorId === dream.id && !d.deleted).sort((a,b) => b.time - a.time)[0];
     if (lastPost && Date.now() - lastPost.time < 6 * 60 * 60 * 1000) return;
     if (Math.random() > 0.3) return; // 30% 概率发
 
     const usableCards = state.cards.filter(c => (c.dreamId || 'all') === 'all' || c.dreamId === dream.id);
     if (usableCards.length === 0) return;
     
-    // 抽取文字
     const count = 2 + Math.floor(Math.random() * 4);
     const text = [...usableCards].sort(() => Math.random() - 0.5).slice(0, count).map(c => c.text).join('\n');
 
-    // 👇 新增：从表情库里收集所有图片
     let allStickers = [];
     if (state.stickerGroups) {
-      state.stickerGroups.forEach(g => {
-        if (g.items) allStickers = allStickers.concat(g.items);
-      });
+      state.stickerGroups.forEach(g => { if (g.items) allStickers = allStickers.concat(g.items); });
     }
 
-    // 👇 随机决定发多少张图（0 到 9 张）
     let pickedImages = [];
-    const imageCount = Math.floor(Math.random() * 10); // 生成 0 到 9 的随机整数
-
+    const imageCount = Math.floor(Math.random() * 10); 
     if (allStickers.length > 0 && imageCount > 0) {
       const shuffledStickers = [...allStickers].sort(() => Math.random() - 0.5);
       pickedImages = shuffledStickers.slice(0, Math.min(imageCount, shuffledStickers.length));
     }
 
-        // 👇 先在 push 外面把数组和随机结果计算好
     const moods = ['开心', '难过', '激动', '平静', '疲惫', '想念', '感动', '心慌', '生气', '冷静', '无聊', '焦虑', '兴奋', '害羞', '期待', '幸福', '孤单'];
     const weathers = ['晴朗', '多云', '小雨', '微风', '中雪', '起雾', '阴天', '中雨', '大雨', '暴雨', '小雪', '大雪', '雾霾', '大风', '冰雹', '彩虹'];
-    const randomMood = moods[Math.floor(Math.random() * moods.length)];
-    const randomWeather = weathers[Math.floor(Math.random() * weathers.length)];
-
-    // 👇 然后再执行 push 塞入数据
+    
     state.diaries.push({
       id: 'diary_' + Date.now() + Math.random().toString(36).slice(2,6),
       authorId: dream.id,
@@ -5336,14 +4779,41 @@ function checkAutoDiary() {
       text: text,
       images: pickedImages, 
       likes: [], 
-      mood: randomMood,       // 👈 填入随机情绪
-      weather: randomWeather, // 👈 填入随机天气
+      mood: moods[Math.floor(Math.random() * moods.length)],       
+      weather: weathers[Math.floor(Math.random() * weathers.length)], 
       time: Date.now(),
       comments: []
     });
+
+    // 👇 新增：发完朋友圈后，在聊天界面加一行小字提示
+    if (!state.chatSessions[dream.id]) state.chatSessions[dream.id] = [];
+    state.chatSessions[dream.id].push({
+      from: 'system',
+      type: 'text',
+      text: `「${dream.name}」发布了一条朋友圈`,
+      time: Date.now()
+    });
+    
+    if (state.currentChatId === dream.id && document.getElementById('pageChat').classList.contains('active')) {
+      renderChatMessages();
+    }
+
+    // 👇 新增：20% 概率删除自己以前发的一条朋友圈
+    if (Math.random() < 0.2) {
+      const myDiaries = state.diaries.filter(d => d.authorId === dream.id && !d.deleted);
+      if (myDiaries.length > 0) {
+        const targetDiary = myDiaries[Math.floor(Math.random() * myDiaries.length)];
+        targetDiary.deleted = true;
+        targetDiary.text = ''; // 清空文字防占用
+        targetDiary.images = []; // 清空图片防占用
+      }
+    }
+    
     saveState();
-    if (document.getElementById('pageScrapbook').classList.contains('active')) renderDiaryList();
   });
+
+  // 刷新朋友圈页面
+  if (document.getElementById('pageScrapbook').classList.contains('active')) renderDiaryList();
 }
 
 setInterval(checkAutoDiary, 10 * 60 * 1000); // 每10分钟检查一次
@@ -5351,7 +4821,7 @@ setTimeout(checkAutoDiary, 5000); // 启动5秒后查一次
 
 // ================= 心情与天气标签 =================
 const WEATHERS = ['晴朗', '多云', '阴天', '小雨', '中雨', '大雨', '暴雨', '小雪', '中雪', '大雪', '暴雪', '雾霾', '大风', '冰雹', '彩虹'];
-const MOODS = ['开心', '难过', '生气', '平静', '冷静', '无聊', '焦虑', '兴奋', '害羞', '期待', '疲惫', '感动', '心慌', '幸福', '孤单'];
+const MOODS = ['开心', '难过', '激动', '平静', '疲惫', '想念', '感动', '心慌', '生气', '冷静', '无聊', '焦虑', '兴奋', '害羞', '期待', '幸福', '孤单'];
 
 let pickedMood = '开心';
 let pickedWeather = '晴朗';
@@ -5421,168 +4891,6 @@ function checkAutoCommentOnDiary() {
   }
 }
 setInterval(checkAutoCommentOnDiary, 10 * 60 * 1000); // 每10分钟检查一次
-
-// ================= 梦角自动发起对局与战报 =================
-function startRandomAiMatch() {
-  if (!state.dreams || state.dreams.length < 2) return;
-  if (state.gomokuAiMatches && state.gomokuAiMatches.some(m => m.active)) return; // 已有对局在进行
-  if (Math.random() > 0.005) return; // 每分钟 0.5% 触发率，差不多 200 分钟一场
-
-  const d1 = state.dreams[Math.floor(Math.random() * state.dreams.length)];
-  const d2 = state.dreams.filter(d => d.id !== d1.id)[Math.floor(Math.random() * (state.dreams.length - 1))];
-
-  createGomokuAiMatch(d1, d2, d1.id);
-}
-
-// 修改 createGomokuAiMatch（发送邀请卡片）
-function createGomokuAiMatch(d1, d2, triggerChatId) {
-  if (!state.gomokuAiMatches) state.gomokuAiMatches = [];
-  var matchId = 'aimatch_' + Date.now();
-  var match = {
-    id: matchId, p1Id: d1.id, p1Name: d1.name, p1Color: Math.random() < 0.5 ? 1 : 2,
-    p2Id: d2.id, p2Name: d2.name, p2Color: 0,
-    board: Array(15).fill(0).map(() => Array(15).fill(0)),
-    moves: [], active: true, startTime: Date.now(),
-    triggerChatId: triggerChatId, turnColor: 1, p1UndoLeft: 3, p2UndoLeft: 3
-  };
-  match.p2Color = match.p1Color === 1 ? 2 : 1;
-  state.gomokuAiMatches.push(match); saveState();
-  
-  if (!triggerChatId) {
-    enterSpectateMode(matchId);
-  } else {
-    // 👇 发邀请卡片到聊天界面
-    if (!state.chatSessions[triggerChatId]) state.chatSessions[triggerChatId] = [];
-    state.chatSessions[triggerChatId].push({
-      from: 'dream', senderId: d1.id, type: 'gomoku_invite', matchId: matchId,
-      p1Name: d1.name, p2Name: d2.name, time: Date.now()
-    });
-    saveState();
-    if (state.currentChatId === triggerChatId) renderChatMessages();
-  }
-  
-  runAiMatchEngine(matchId);
-}
-
-// ===== 重写：绝对健壮的 AI 对弈引擎 =====
-window._aiMatchTimers = window._aiMatchTimers || {};
-
-function runAiMatchEngine(matchId) {
-  var match = state.gomokuAiMatches.find(m => m.id === matchId);
-  if (!match || !match.active) return;
-
-  // 清理可能残留的旧定时器
-  if (window._aiMatchTimers[matchId]) clearTimeout(window._aiMatchTimers[matchId]);
-
-  function step() {
-    var m = state.gomokuAiMatches.find(x => x.id === matchId);
-    if (!m || !m.active) return;
-
-    // 🚨 核心防护：如果对局超过 15 分钟，强制判平局，防止死锁
-    if (Date.now() - m.startTime > 15 * 60 * 1000) {
-      endGomokuAiMatch(m, 'draw');
-      return;
-    }
-
-    var maxMy = -1, maxEnemy = -1;
-    var bestMy = [], bestEnemy = [];
-    
-    // 寻找最佳落子
-    for (var y = 0; y < 15; y++) {
-      for (var x = 0; x < 15; x++) {
-        if (m.board[y][x] === 0) {
-          var myS = evaluateGomokuPointBoard(m.board, x, y, m.turnColor);
-          var enS = evaluateGomokuPointBoard(m.board, x, y, m.turnColor === 1 ? 2 : 1);
-          if (myS > maxMy) { maxMy = myS; bestMy = [{x, y}]; } else if (myS === maxMy) bestMy.push({x, y});
-          if (enS > maxEnemy) { maxEnemy = enS; bestEnemy = [{x, y}]; } else if (enS === maxEnemy) bestEnemy.push({x, y});
-        }
-      }
-    }
-
-    var move = null;
-    if (maxMy >= 10000000) move = bestMy[Math.floor(Math.random() * bestMy.length)];
-    else if (maxEnemy >= 10000000) move = bestEnemy[Math.floor(Math.random() * bestEnemy.length)];
-    else if (maxMy >= 1000000) move = bestMy[Math.floor(Math.random() * bestMy.length)];
-    else if (maxEnemy >= 1000000) move = bestEnemy[Math.floor(Math.random() * bestEnemy.length)];
-    else {
-      var bestScore = -1, bestMoves = [];
-      for (var y = 0; y < 15; y++) {
-        for (var x = 0; x < 15; x++) {
-          if (m.board[y][x] === 0) {
-            var score = evaluateGomokuPointBoard(m.board, x, y, m.turnColor) + evaluateGomokuPointBoard(m.board, x, y, m.turnColor === 1 ? 2 : 1) * 0.8 + Math.random();
-            if (score > bestScore) { bestScore = score; bestMoves = [{x, y}]; } else if (score === bestScore) bestMoves.push({x, y});
-          }
-        }
-      }
-      if (bestMoves.length > 0) move = bestMoves[Math.floor(Math.random() * bestMoves.length)];
-    }
-
-    if (!move) { endGomokuAiMatch(m, 'draw'); return; }
-
-    // 落子
-    m.board[move.y][move.x] = m.turnColor;
-    m.moves.push({x: move.x, y: move.y, color: m.turnColor});
-
-    // 检查输赢
-    if (checkGomokuWinBoard(m.board, move.x, move.y, m.turnColor)) {
-      var winnerId = m.turnColor === m.p1Color ? m.p1Id : m.p2Id;
-      endGomokuAiMatch(m, winnerId);
-      return;
-    }
-
-    // 换手
-    m.turnColor = m.turnColor === 1 ? 2 : 1;
-    saveState();
-
-    // 如果你正在看这局，就刷新画面
-    if (gomoku.mode === 'spectate' && gomoku.spectateMatchId === matchId) {
-      gomoku.board = m.board;
-      gomoku.currentTurn = m.turnColor;
-      drawGomokuBoard();
-      updateGomokuUI();
-    }
-
-    // 准备下一步
-    window._aiMatchTimers[matchId] = setTimeout(step, 800 + Math.random() * 1500);
-  }
-
-  step();
-}
-
-// 修改 endGomokuAiMatch（发送战报卡片）
-function endGomokuAiMatch(match, winnerId) {
-  match.active = false; match.endTime = Date.now(); match.winner = winnerId;
-  match.duration = Math.floor((match.endTime - match.startTime) / 1000); saveState();
-  var winnerName = winnerId === 'draw' ? '平局' : (winnerId === match.p1Id ? match.p1Name : match.p2Name);
-  
-  if (!state.gomokuHistory) state.gomokuHistory = [];
-  state.gomokuHistory.push({
-    id: match.id, startTime: match.startTime, endTime: match.endTime, duration: match.duration,
-    dreamName: match.p1Name + ' vs ' + match.p2Name, userColor: 0,
-    winner: winnerId === 'draw' ? 'draw' : 'ai', winnerName: winnerName, reason: 'five',
-    p1Name: match.p1Name, p2Name: match.p2Name, p1Color: match.p1Color, p2Color: match.p2Color
-  });
-  saveState();
-
-  // 👇 发战报卡片到聊天界面
-  if (match.triggerChatId) {
-    if (!state.chatSessions[match.triggerChatId]) state.chatSessions[match.triggerChatId] = [];
-    state.chatSessions[match.triggerChatId].push({
-      from: 'dream', senderId: match.p1Id, type: 'gomoku_result', matchId: match.id,
-      p1Name: match.p1Name, p2Name: match.p2Name, p1Color: match.p1Color, p2Color: match.p2Color,
-      winnerName: winnerName, time: Date.now()
-    });
-    saveState();
-    if (state.currentChatId === match.triggerChatId) renderChatMessages();
-  }
-
-  if (gomoku.mode === 'spectate' && gomoku.spectateMatchId === match.id) {
-    gomoku.board = match.board; drawGomokuBoard(); updateGomokuUI(); showToast('对局结束：' + winnerName + ' 获胜');
-  }
-}
-
-// 开启定时器
-setInterval(startRandomAiMatch, 60 * 1000);
 
 // ================= 终极修复收尾 =================
 function openClaimDreamPacketModal(packetId, msgIndex) {
@@ -5685,4 +4993,236 @@ function deleteMail(id) {
   showToast('已删除');
 }
 
+// ================= 头像库标心渲染重写 =================
+const originalRenderAvatarLib = renderAvatarLib;
+renderAvatarLib = function() {
+  if (!state.avatarLibrary) state.avatarLibrary = [];
+  const grid = document.getElementById('avatarLibGrid');
+  const editBtn = document.getElementById('avatarEditBtn');
+  const editBar = document.getElementById('avatarEditBar');
+  if (!grid) return;
+
+  editBtn.textContent = isAvatarEditMode ? '完成' : '编辑';
+  editBtn.style.color = isAvatarEditMode ? 'var(--red)' : 'var(--blue)';
+  editBar.style.display = isAvatarEditMode ? 'flex' : 'none';
+
+  if (state.avatarLibrary.length === 0) {
+    grid.innerHTML = '<div class="avatar-lib-empty">还没有头像<br>点右上角 + 导入一批图片吧</div>';
+    return;
+  }
+
+  grid.innerHTML = state.avatarLibrary.map((img, i) => {
+    const selected = avatarSelectedIndices.includes(i);
+    // 👇 判断有没有被标心
+    const isLiked = state.likedAvatars.includes(img);
+    return `
+      <div class="avatar-lib-item ${selected ? 'selected' : ''}" onclick="avatarItemClick(${i})">
+        <img src="${img}">
+        ${isLiked && !isAvatarEditMode ? `<div style="position:absolute; bottom:4px; left:4px; font-size:16px; z-index:10; text-shadow:0 1px 3px rgba(0,0,0,0.5);">❤️</div>` : ''}
+        ${isAvatarEditMode ? `<div class="avatar-lib-check ${selected ? 'checked' : ''}">${selected ? '✓' : ''}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+};
+
+// ================= 昵称库完整逻辑 =================
+function renderNicknameLib() {
+  const container = document.getElementById('nicknameListContainer');
+  if (!container) return;
+  
+  // 👇 强制兜底
+  if (!state.nicknameLibrary) state.nicknameLibrary = [];
+
+  if (state.nicknameLibrary.length === 0) {
+    container.innerHTML = '<div style="text-align:center; color:#999; padding:40px; font-size:14px;">还没有昵称，点右上角 + 添加</div>';
+    return;
+  }
+
+  container.innerHTML = state.nicknameLibrary.map((item, index) => {
+    // 如果老数据是纯字符串，兼容一下
+    const text = typeof item === 'string' ? item : item.text;
+    const liked = typeof item === 'object' ? item.liked : false;
+
+    return `
+      <div style="display:flex; justify-content:space-between; align-items:center; background:#fff; padding:12px 16px; border-radius:12px; margin-bottom:10px; box-shadow:0 2px 6px rgba(0,0,0,0.03);">
+        <div style="flex:1; font-size:15px; color:#1d1d1f; display:flex; align-items:center; gap:8px;">
+          ${text}
+          ${liked ? '<span style="font-size:14px;">❤️</span>' : ''}
+        </div>
+        <div style="display:flex; gap:12px; font-size:16px; color:#ccc;">
+          <span onclick="editNickname(${index})" style="cursor:pointer;">✎</span>
+          <span onclick="deleteNickname(${index})" style="cursor:pointer; color:#ff3b30;">🗑</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function openAddNicknameModal() {
+  const input = prompt('输入昵称（支持批量添加，用换行或逗号隔开）：');
+  if (!input || !input.trim()) return;
+  
+  const lines = input.split(/[\n,，;；]/).map(s => s.trim()).filter(s => s);
+  let added = 0;
+  
+  lines.forEach(line => {
+    // 防重复
+    if (!state.nicknameLibrary.some(n => n.text === line)) {
+      state.nicknameLibrary.push({ text: line, liked: false });
+      added++;
+    }
+  });
+  
+  if (added > 0) {
+    saveState();
+    renderNicknameLib();
+    showToast(`已添加 ${added} 个昵称`);
+  } else {
+    showToast('昵称已存在');
+  }
+}
+
+function editNickname(index) {
+  const item = state.nicknameLibrary[index];
+  if (!item) return;
+  const newText = prompt('编辑昵称：', item.text);
+  if (newText && newText.trim() && newText.trim() !== item.text) {
+    item.text = newText.trim();
+    saveState();
+    renderNicknameLib();
+    showToast('昵称已修改');
+  }
+}
+
+function deleteNickname(index) {
+  if (!confirm('确定删除该昵称吗？')) return;
+  state.nicknameLibrary.splice(index, 1);
+  saveState();
+  renderNicknameLib();
+  showToast('已删除');
+}
+
+// ================= 梦角主动换头像/昵称 + 标心（重写定时器） =================
+function checkAvatarAndNickname() {
+  const now = Date.now();
+  const last = state.lastAvatarScan || 0;
+  const THREE_HOURS = 3 * 60 * 60 * 1000;
+  if (now - last < THREE_HOURS) return;
+  
+  state.lastAvatarScan = now;
+  saveState();
+
+  // 1. 头像标心逻辑（50%概率）
+  if (state.avatarLibrary && state.avatarLibrary.length > 0 && Math.random() < 0.5) {
+    const randomAvatar = state.avatarLibrary[Math.floor(Math.random() * state.avatarLibrary.length)];
+    if (!state.likedAvatars.includes(randomAvatar)) {
+      state.likedAvatars.push(randomAvatar);
+      // 随便找个梦角发个系统小字
+      const d = state.dreams[Math.floor(Math.random() * state.dreams.length)];
+      if (d) addAvatarSystemMsg(d.id, `「${d.name}」标记了一张喜欢的头像`);
+    }
+  }
+
+  // 2. 昵称标心逻辑（50%概率）
+  if (state.nicknameLibrary && state.nicknameLibrary.length > 0 && Math.random() < 0.5) {
+    const unloved = state.nicknameLibrary.filter(n => !n.liked);
+    if (unloved.length > 0) {
+      const pick = unloved[Math.floor(Math.random() * unloved.length)];
+      pick.liked = true;
+      const d = state.dreams[Math.floor(Math.random() * state.dreams.length)];
+      if (d) addAvatarSystemMsg(d.id, `「${d.name}」觉得「${pick.text}」这个名字很好听`);
+    }
+  }
+
+  // 3. 换头像逻辑（原版 30%）
+  if (state.avatarLibrary && state.avatarLibrary.length > 0 && Math.random() < 0.30) {
+    const dreamA = state.dreams[Math.floor(Math.random() * state.dreams.length)];
+    if (dreamA) {
+      const newImg = state.avatarLibrary[Math.floor(Math.random() * state.avatarLibrary.length)];
+      dreamA.avatar = newImg;
+      addAvatarSystemMsg(dreamA.id, `「${dreamA.name}」为自己更换了头像`);
+    }
+  }
+
+  // 4. 换昵称逻辑（原版换头像的 30%）
+  if (state.nicknameLibrary && state.nicknameLibrary.length > 0 && Math.random() < 0.30) {
+    const dreamA = state.dreams[Math.floor(Math.random() * state.dreams.length)];
+    if (dreamA) {
+      const newNameItem = state.nicknameLibrary[Math.floor(Math.random() * state.nicknameLibrary.length)];
+      const isForDream = Math.random() < 0.5; // 50%给自己换，50%给用户换
+
+      if (isForDream) {
+        const oldName = dreamA.name; // 👈 先把旧名字存下来
+        dreamA.name = newNameItem.text;
+        addAvatarSystemMsg(dreamA.id, `「${oldName}」把自己的昵称改成了「${newNameItem.text}」`);
+      } else {
+        const oldUserName = state.profile.name || '你'; // 👈 存下用户的旧名字
+        state.profile.name = newNameItem.text;
+        addAvatarSystemMsg(dreamA.id, `「${dreamA.name}」把你的昵称从「${oldUserName}」改成了「${newNameItem.text}」`);
+      }
+    }
+  }
+
+  saveState();
+  renderAll(); 
+  if (state.currentChatId) renderChatMessages(); 
+  renderContacts(); 
+  if (document.getElementById('pageNickname').classList.contains('active')) renderNicknameLib();
+}
+
+// 把原来的定时器替换成这个
+// (如果你之前有 setInterval(checkAvatarRandomChange, ...)，请把它删掉或注释掉)
+setInterval(checkAvatarAndNickname, 10 * 60 * 1000);
+setTimeout(checkAvatarAndNickname, 5000);
+
 loadState();
+
+// ================= 密码锁逻辑 =================
+function checkLockPassword() {
+  const input = document.getElementById('lockPasswordInput').value;
+  const errorMsg = document.getElementById('lockError');
+  const lockScreen = document.getElementById('lockScreen');
+  
+  // 设定的密码
+  const CORRECT_PASSWORD = 'L&H030328/';
+
+  if (input === CORRECT_PASSWORD) {
+    // 密码正确，把锁屏往上滑出（加个简单的动画）
+    lockScreen.style.transition = 'transform 0.4s ease-in, opacity 0.4s ease-in';
+    lockScreen.style.transform = 'translateY(-100%)';
+    lockScreen.style.opacity = '0';
+    
+    // 动画结束后彻底移除节点
+    setTimeout(() => {
+      lockScreen.style.display = 'none';
+    }, 400);
+
+    // 如果之前有因为锁屏导致未初始化完的渲染，可以在此时强行刷新一次
+    renderAll();
+    if (state.currentChatId) renderChatMessages();
+    
+  } else {
+    // 密码错误
+    errorMsg.textContent = '密码错误，请重试！';
+    document.getElementById('lockPasswordInput').value = '';
+    document.getElementById('lockPasswordInput').focus();
+    
+    // 错误抖动效果
+    const card = lockScreen.querySelector('div');
+    card.style.transform = 'translateX(-10px)';
+    setTimeout(() => card.style.transform = 'translateX(10px)', 50);
+    setTimeout(() => card.style.transform = 'translateX(-10px)', 100);
+    setTimeout(() => card.style.transform = 'translateX(0)', 150);
+    
+    // 3秒后清空错误提示
+    setTimeout(() => { errorMsg.textContent = ''; }, 3000);
+  }
+}
+
+// 每次刷新页面，自动让输入框获取焦点
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    const input = document.getElementById('lockPasswordInput');
+    if (input) input.focus();
+  }, 500);
+});
