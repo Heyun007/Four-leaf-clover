@@ -1523,21 +1523,7 @@ function generateAndSendMessage(chatId, isFirst) {
   const userMsgs = msgs.filter(m => m.from === 'user').slice(-5);
 
     // 👇 获取所有被屏蔽的分类
-  const blockedCats = (state.categories || []).filter(cat => cat.blocked).map(cat => cat.id);
-
-  const usableCards = state.cards.filter(c => 
-    (c.dreamId || 'all') === 'all' || c.dreamId === chatId
-  ).filter(c => {
-    if (!c.text || typeof c.text !== 'string') return false;
-    const trimmed = c.text.trim();
-    if (trimmed.length === 0) return false;
-    if (/[\u200B-\u200D\uFEFF\uFFFD\u25A0\u25A1\uFFFC]/.test(trimmed)) return false;
-    
-    if (c.blocked) return false; // 👈 核心修复：字卡被屏蔽了，跳过
-    if (c.cat && blockedCats.includes(c.cat)) return false; // 👈 核心修复：所在分类被屏蔽了，跳过
-    
-    return true;
-  });
+  const usableCards = getUsableCards(chatId);
 
   let allStickers = [];
   state.stickerGroups.forEach(g => { if (g.items) allStickers = allStickers.concat(g.items); });
@@ -3842,9 +3828,7 @@ function checkAutoMessage() {
 
   var picked = candidates[Math.floor(Math.random() * candidates.length)];
   
-  var usableCards = state.cards.filter(function(c) {
-    return (c.dreamId || 'all') === 'all' || c.dreamId === picked.id;
-  });
+    var usableCards = getUsableCards(picked.id);
   var text = usableCards.length > 0 ? usableCards[Math.floor(Math.random() * usableCards.length)].text : '你在忙吗？';
   
     // 👇 加入随机情绪标签
@@ -4143,9 +4127,7 @@ function aiReplyLetter(letterId) {
 
   // 从字卡库抽 8-15 句
   const count = 8 + Math.floor(Math.random() * 8);
-    const usableCards = state.cards.filter(c => 
-    ((c.dreamId || 'all') === 'all' || c.dreamId === dream.id) && !c.blocked
-  );
+    const usableCards = getUsableCards(dream.id);
   if (usableCards.length === 0) return;
 
   const shuffled = [...usableCards].sort(() => Math.random() - 0.5);
@@ -4193,9 +4175,7 @@ function checkAutoLetter() {
   const dream = state.dreams[Math.floor(Math.random() * state.dreams.length)];
 
   const count = 8 + Math.floor(Math.random() * 8);
-    const usableCards = state.cards.filter(c => 
-    ((c.dreamId || 'all') === 'all' || c.dreamId === dream.id) && !c.blocked
-  );
+      const usableCards = getUsableCards(dream.id);
   if (usableCards.length === 0) return;
   
   const shuffled = [...usableCards].sort(() => Math.random() - 0.5);
@@ -4527,9 +4507,7 @@ function checkAutoDreamSchedule() {
     if (dream.lastScheduleDate === todayStr) return;
     if (Math.random() > 0.3) return;
 
-      const usableCards = state.cards.filter(c => 
-    ((c.dreamId || 'all') === 'all' || c.dreamId === dream.id) && !c.blocked
-  );
+        const usableCards = getUsableCards(dream.id);
     if (usableCards.length === 0) return;
 
     // 随机抽 1-3 张字卡拼成名字
@@ -4894,9 +4872,7 @@ function triggerAiComment(diaryId) {
   const dream = state.dreams[Math.floor(Math.random() * state.dreams.length)];
   if (!d.comments) d.comments = [];
   
-    const usableCards = state.cards.filter(c => 
-    ((c.dreamId || 'all') === 'all' || c.dreamId === dream.id) && !c.blocked
-  );
+      const usableCards = getUsableCards(dream.id);
   const text = usableCards.length > 0 ? usableCards[Math.floor(Math.random() * usableCards.length)].text : '……';
 
   d.comments.push({
@@ -4928,9 +4904,7 @@ function checkAutoDiary() {
     if (lastPost && Date.now() - lastPost.time < 6 * 60 * 60 * 1000) return;
     if (Math.random() > 0.3) return; // 30% 概率发
 
-      const usableCards = state.cards.filter(c => 
-    ((c.dreamId || 'all') === 'all' || c.dreamId === dream.id) && !c.blocked
-  );
+        const usableCards = getUsableCards(dream.id);
     if (usableCards.length === 0) return;
     
     const count = 2 + Math.floor(Math.random() * 4);
@@ -5051,9 +5025,7 @@ function checkAutoCommentOnDiary() {
   // 如果这个梦角已经评论过了，就不评了
   if (diary.comments && diary.comments.some(c => c.authorId === dream.id)) return;
 
-    const usableCards = state.cards.filter(c => 
-    ((c.dreamId || 'all') === 'all' || c.dreamId === dream.id) && !c.blocked
-  );
+      const usableCards = getUsableCards(dream.id);
   if (usableCards.length === 0) return;
   const text = usableCards[Math.floor(Math.random() * usableCards.length)].text;
 
@@ -5485,19 +5457,22 @@ function pushNotification(title, body, avatarUrl) {
     }
   }
 
-  // 2. 👇 核心：只要网页处于前台（即使你在聊天界面），强行在网页内部弹出一个横幅！
-  // 网页内部的弹窗，浏览器是绝对不会拦截的。
+    // 2. 👇 核心：只要网页处于前台（即使你在聊天界面），强行在网页内部弹出一个横幅！
   if (document.visibilityState === 'visible') {
     let banner = document.getElementById('customNotifyBanner');
     if (!banner) {
       banner = document.createElement('div');
       banner.id = 'customNotifyBanner';
-      banner.style.cssText = 'position:absolute; top:60px; left:50%; transform:translateX(-50%) translateY(-100px); background:rgba(255,255,255,0.98); backdrop-filter:blur(10px); box-shadow:0 10px 30px rgba(0,0,0,0.15); border-radius:16px; padding:12px 16px; width:85%; z-index:9999999; display:flex; align-items:center; gap:12px; transition:transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); border:1px solid rgba(0,0,0,0.05); cursor:pointer;';
+      // 核心改动：使用 opacity 控制显隐，用 fixed 绝对定位防止被挤压
+      banner.style.cssText = 'position:fixed; top:60px; left:50%; transform:translateX(-50%); background:rgba(255,255,255,0.98); backdrop-filter:blur(10px); box-shadow:0 10px 30px rgba(0,0,0,0.15); border-radius:16px; padding:12px 16px; width:85%; max-width:340px; z-index:9999999; display:flex; align-items:center; gap:12px; transition:opacity 0.3s ease, top 0.3s ease; border:1px solid rgba(0,0,0,0.05); cursor:pointer; opacity:0; pointer-events:none;';
+      
       banner.onclick = function() {
-        this.style.transform = 'translateX(-50%) translateY(-100px)';
-        openChat(state.currentChatId); // 点击横幅回聊天
+        this.style.opacity = '0';
+        this.style.top = '40px';
+        this.style.pointerEvents = 'none';
+        if (state.currentChatId) openChat(state.currentChatId);
       };
-      document.querySelector('.phone-container').appendChild(banner);
+      document.body.appendChild(banner);
     }
     
     banner.innerHTML = `
@@ -5508,12 +5483,40 @@ function pushNotification(title, body, avatarUrl) {
       </div>
     `;
     
-    // 滑入
-    setTimeout(() => { banner.style.transform = 'translateX(-50%) translateY(0)'; }, 50);
-    // 3秒后自动滑出
-    if(window._bannerTimer) clearTimeout(window._bannerTimer);
+    // 强制重绘后显示
+    setTimeout(() => {
+      banner.style.opacity = '1';
+      banner.style.top = '60px';
+      banner.style.pointerEvents = 'auto';
+    }, 20);
+    
+    // 清除旧定时器，3秒后自动隐藏
+    if (window._bannerTimer) clearTimeout(window._bannerTimer);
     window._bannerTimer = setTimeout(() => {
-      banner.style.transform = 'translateX(-50%) translateY(-100px)';
+      banner.style.opacity = '0';
+      banner.style.top = '40px';
+      banner.style.pointerEvents = 'none';
     }, 3000);
   }
+
+// ================= 统一的字卡获取总闸 =================
+function getUsableCards(dreamId) {
+  // 获取所有被屏蔽的分类
+  const blockedCats = (state.categories || []).filter(cat => cat.blocked).map(cat => cat.id);
+  
+  return state.cards.filter(c => {
+    // 1. 归属过滤
+    if ((c.dreamId || 'all') !== 'all' && c.dreamId !== dreamId) return false;
+    // 2. 内容过滤
+    if (!c.text || typeof c.text !== 'string') return false;
+    const trimmed = c.text.trim();
+    if (trimmed.length === 0) return false;
+    if (/[\u200B-\u200D\uFEFF\uFFFD\u25A0\u25A1\uFFFC]/.test(trimmed)) return false;
+    // 3. 单张卡屏蔽过滤
+    if (c.blocked) return false;
+    // 4. 分类屏蔽过滤（核心！）
+    if (c.cat && blockedCats.includes(c.cat)) return false;
+    
+    return true;
+  });
 }
