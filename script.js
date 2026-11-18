@@ -3853,33 +3853,31 @@ function checkAutoMessage() {
 
   var isViewingThisChat = (document.getElementById('pageChat').classList.contains('active') && state.currentChatId === picked.id);
   
-    if (!isViewingThisChat) {
+      if (!isViewingThisChat) {
+    // 1. 先触发网页内的小黑条（你看着网页时用）
     try { sendNotification(picked.name, text); } catch(e){}
     
-    // 👇 强制调用手机系统原生推送（优化版）
+    // 2. 强制调用手机系统原生推送
     if (state.settings && state.settings.pushEnabled && "Notification" in window && Notification.permission === "granted") {
-      try {
-        // 使用 Service Worker 推送（如果支持的话，这是手机端唯一能穿透后台的办法）
-        if (navigator.serviceWorker && navigator.serviceWorker.ready) {
-          navigator.serviceWorker.ready.then(function(registration) {
-            registration.showNotification(picked.name, {
-              body: text,
-              icon: picked.avatar || 'icon.png',
-              tag: 'auto-msg-' + picked.id,
-              vibrate: [200, 100, 200], // 震动模式
-              requireInteraction: true // 常驻通知（需要手动点击清除）
-            });
+      
+      // 👇 必须检查 Service Worker 是否可用
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.ready.then(function(registration) {
+          registration.showNotification(picked.name, {
+            body: text,
+            icon: picked.avatar || './icon.png', // 使用本地图标防拦截
+            tag: 'auto-msg-' + picked.id,
+            vibrate: [200, 100, 200], // 手机震动
+            requireInteraction: true  // 必须用户手动点掉才消失
           });
-        } else {
-          // 如果不支持 SW，退回普通通知
-          new Notification(picked.name, { 
-            body: text, 
-            tag: 'auto-msg-' + picked.id, 
-            icon: picked.avatar || '' 
-          });
-        }
-      } catch(e){
-        console.log('推送失败', e);
+        }).catch(e => {
+          console.log('SW 推送失败', e);
+          // 兜底：如果 SW 失败，强行弹普通通知
+          new Notification(picked.name, { body: text, icon: './icon.png' });
+        });
+      } else {
+        // 如果浏览器不支持 SW（或者还没注册完），退回普通通知
+        new Notification(picked.name, { body: text, icon: './icon.png' });
       }
     }
   }
@@ -5295,7 +5293,7 @@ function checkAvatarAndNickname() {
   saveState();
 
   // 1. 头像标心逻辑（50%概率）
-  if (state.avatarLibrary && state.avatarLibrary.length > 0 && Math.random() < 0.5) {
+  if (state.avatarLibrary && state.avatarLibrary.length > 0 && Math.random() < 0.1) {
     const randomAvatar = state.avatarLibrary[Math.floor(Math.random() * state.avatarLibrary.length)];
     if (!state.likedAvatars.includes(randomAvatar)) {
       state.likedAvatars.push(randomAvatar);
@@ -5306,7 +5304,7 @@ function checkAvatarAndNickname() {
   }
 
   // 2. 昵称标心逻辑（50%概率）
-  if (state.nicknameLibrary && state.nicknameLibrary.length > 0 && Math.random() < 0.5) {
+  if (state.nicknameLibrary && state.nicknameLibrary.length > 0 && Math.random() < 0.1) {
     const unloved = state.nicknameLibrary.filter(n => !n.liked);
     if (unloved.length > 0) {
       const pick = unloved[Math.floor(Math.random() * unloved.length)];
@@ -5317,7 +5315,7 @@ function checkAvatarAndNickname() {
   }
 
   // 3. 换头像逻辑（原版 30%）
-  if (state.avatarLibrary && state.avatarLibrary.length > 0 && Math.random() < 0.30) {
+  if (state.avatarLibrary && state.avatarLibrary.length > 0 && Math.random() < 0.05) {
     const dreamA = state.dreams[Math.floor(Math.random() * state.dreams.length)];
     if (dreamA) {
       const newImg = state.avatarLibrary[Math.floor(Math.random() * state.avatarLibrary.length)];
@@ -5327,7 +5325,7 @@ function checkAvatarAndNickname() {
   }
 
   // 4. 换昵称逻辑（原版换头像的 30%）
-  if (state.nicknameLibrary && state.nicknameLibrary.length > 0 && Math.random() < 0.30) {
+  if (state.nicknameLibrary && state.nicknameLibrary.length > 0 && Math.random() < 0.05) {
     const dreamA = state.dreams[Math.floor(Math.random() * state.dreams.length)];
     if (dreamA) {
       const newNameItem = state.nicknameLibrary[Math.floor(Math.random() * state.nicknameLibrary.length)];
