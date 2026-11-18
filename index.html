@@ -1079,47 +1079,6 @@
       });
     }
   </script>
-
-  <!-- 测试通知的按钮 -->
-<button onclick="testNotification()" style="position:fixed; bottom:80px; left:20px; z-index:999999; background:red; color:white; padding:10px; border-radius:10px;">
-  点我测试系统通知
-</button>
-
-<script>
-  function testNotification() {
-    // 1. 强行申请权限
-    if (!("Notification" in window)) {
-      alert("❌ 你的浏览器不支持通知 API");
-      return;
-    }
-
-    Notification.requestPermission().then(perm => {
-      if (perm === "granted") {
-        alert("✅ 权限已获取！正在发送测试通知...");
-        
-        // 2. 尝试用最普通的方式弹通知
-        try {
-          new Notification("普通测试通知", { body: "如果你能看到这个，说明系统允许弹窗！" });
-        } catch (e) {
-          console.log("普通通知失败:", e);
-        }
-
-        // 3. 尝试用 Service Worker 弹通知
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.ready.then(reg => {
-            reg.showNotification("SW 测试通知", {
-              body: "如果你能看到这个，说明后台推送通道完美打通！",
-              icon: "./icon.png",
-              vibrate: [200, 100, 200]
-            });
-          });
-        }
-      } else {
-        alert("❌ 权限被拒绝！状态： " + perm + "\n\n请去手机【系统设置】->【应用管理】->【找到你用的浏览器】->【通知管理】，把“允许通知”打开！再去浏览器地址栏的锁头里把通知改成允许。");
-      }
-    });
-  }
-</script>
   
 </body>
 
