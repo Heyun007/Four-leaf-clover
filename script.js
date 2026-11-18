@@ -5457,6 +5457,7 @@ function pushNotification(title, body, avatarUrl) {
       banner.style.pointerEvents = 'none';
     }, 3000);
   }
+}
 
 // ================= 统一的字卡获取总闸 =================
 function getUsableCards(dreamId) {
