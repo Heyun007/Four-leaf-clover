@@ -1811,8 +1811,8 @@ function generateAndSendMessage(chatId, isFirst) {
   }
 
     // 👇 梦角回复时，无条件弹通知
-  if (s.pushEnabled && Notification.permission === 'granted') {
-    pushNotification(state.dreams.find(d=>d.id===chatId)?.name || '梦角', newMsg.type === 'text' ? newMsg.text : '[消息]');
+    if (s.pushEnabled && Notification.permission === 'granted') {
+    pushNotification(state.dreams.find(d=>d.id===chatId)?.name || '梦角', newMsg.type === 'text' ? newMsg.text : '[消息]', state.dreams.find(d=>d.id===chatId)?.avatar);
   }
 }
 
@@ -5468,25 +5468,52 @@ function japaneseFilter(text) {
   return result;
 }
 
-// ================= 统一的高优系统通知 =================
+// ================= 统一的高优系统通知 + 网页内横幅 =================
 function pushNotification(title, body, avatarUrl) {
-  if (!state.settings || !state.settings.pushEnabled) return;
-  if (Notification.permission !== "granted") return;
-  
-  // 强制走 Service Worker，这才是唯一能在后台弹出来的
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.ready.then(function(reg) {
-      reg.showNotification(title, {
-        body: body,
-        icon: avatarUrl || "./icon.png",
-        badge: "./icon.png",
-        vibrate: [200, 100, 200],
-        tag: 'msg-' + Date.now()
-      });
-    }).catch(function(err) {
-      console.log("SW 推送失败", err);
-    });
-  } else {
-    try { new Notification(title, { body: body, icon: avatarUrl || "./icon.png" }); } catch(e) {}
+  // 1. 先尝试发系统通知（适合在后台/息屏时）
+  if (state.settings && state.settings.pushEnabled && Notification.permission === "granted") {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready.then(function(reg) {
+        reg.showNotification(title, {
+          body: body,
+          icon: avatarUrl || "./icon.png",
+          badge: "./icon.png",
+          vibrate: [200, 100, 200],
+          tag: 'msg-' + Date.now()
+        });
+      }).catch(function(err) {});
+    }
+  }
+
+  // 2. 👇 核心：只要网页处于前台（即使你在聊天界面），强行在网页内部弹出一个横幅！
+  // 网页内部的弹窗，浏览器是绝对不会拦截的。
+  if (document.visibilityState === 'visible') {
+    let banner = document.getElementById('customNotifyBanner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'customNotifyBanner';
+      banner.style.cssText = 'position:absolute; top:60px; left:50%; transform:translateX(-50%) translateY(-100px); background:rgba(255,255,255,0.98); backdrop-filter:blur(10px); box-shadow:0 10px 30px rgba(0,0,0,0.15); border-radius:16px; padding:12px 16px; width:85%; z-index:9999999; display:flex; align-items:center; gap:12px; transition:transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); border:1px solid rgba(0,0,0,0.05); cursor:pointer;';
+      banner.onclick = function() {
+        this.style.transform = 'translateX(-50%) translateY(-100px)';
+        openChat(state.currentChatId); // 点击横幅回聊天
+      };
+      document.querySelector('.phone-container').appendChild(banner);
+    }
+    
+    banner.innerHTML = `
+      <img src="${avatarUrl || './icon.png'}" style="width:44px; height:44px; border-radius:50%; object-fit:cover;">
+      <div style="flex:1; min-width:0;">
+        <div style="font-size:15px; font-weight:600; color:#1d1d1f; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${title}</div>
+        <div style="font-size:13px; color:#666; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px;">${body}</div>
+      </div>
+    `;
+    
+    // 滑入
+    setTimeout(() => { banner.style.transform = 'translateX(-50%) translateY(0)'; }, 50);
+    // 3秒后自动滑出
+    if(window._bannerTimer) clearTimeout(window._bannerTimer);
+    window._bannerTimer = setTimeout(() => {
+      banner.style.transform = 'translateX(-50%) translateY(-100px)';
+    }, 3000);
   }
 }
