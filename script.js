@@ -3417,6 +3417,7 @@ function applyBeautifySettings() {
   fontStyle.innerHTML = `
     body, .chat-bubble, input, textarea, .page-header h2, .avatar-name, #chatMessageContainer span, #chatMessageContainer div { 
       font-size: ${size}px !important; 
+      font-family: sans-serif !important; 
     }
   `;
 
