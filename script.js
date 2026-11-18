@@ -5288,7 +5288,7 @@ function deleteNickname(index) {
 function checkAvatarAndNickname() {
   const now = Date.now();
   const last = state.lastAvatarScan || 0;
-  const THREE_HOURS = 0.1 * 60 * 60 * 1000;
+  const THREE_HOURS = 1 * 60 * 60 * 1000;
   if (now - last < THREE_HOURS) return;
   
   state.lastAvatarScan = now;
