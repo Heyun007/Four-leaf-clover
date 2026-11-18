@@ -3420,22 +3420,26 @@ function applyBeautifySettings() {
     }
   `;
 
-  // 2. 聊天背景壁纸
+  // 2. 聊天背景壁纸（铺满整个手机底层，让顶栏和底栏也能透出来）
+  const phoneContainer = document.querySelector('.phone-container');
   const chatPage = document.getElementById('pageChat');
   const msgContainer = document.getElementById('chatMessageContainer');
   
-  if (chatPage && msgContainer) {
+  if (phoneContainer) {
     if (state.settings.globalWallpaper) {
-      chatPage.style.backgroundImage = `url(${state.settings.globalWallpaper})`;
-      chatPage.style.backgroundSize = 'cover';
-      chatPage.style.backgroundPosition = 'center';
-      // 👇 核心修复：必须把消息容器的背景设为透明，否则壁纸被挡住
-      msgContainer.style.background = 'transparent'; 
+      phoneContainer.style.backgroundImage = `url(${state.settings.globalWallpaper})`;
+      phoneContainer.style.backgroundSize = 'cover';
+      phoneContainer.style.backgroundPosition = 'center';
     } else {
-      chatPage.style.backgroundImage = '';
-      chatPage.style.background = '#ededed';
-      msgContainer.style.background = '#ededed'; // 恢复默认灰底
+      phoneContainer.style.backgroundImage = '';
+      phoneContainer.style.background = 'var(--bg)';
     }
+  }
+
+  if (chatPage && msgContainer) {
+    // 聊天页和消息容器始终透明，让底部的壁纸透上来
+    chatPage.style.background = 'transparent';
+    msgContainer.style.background = 'transparent';
   }
 
   // 3. 全局自定义 CSS 注入
@@ -3468,12 +3472,13 @@ function applyBeautifySettings() {
   const icons = document.querySelectorAll('.nav-icon');
   icons.forEach(icon => { icon.style.color = state.settings.iconColor || '#666'; });
 
-    // 顶部、底部半透明（加入毛玻璃效果，让透明更真实）
+      // 顶部、底部半透明（加入毛玻璃效果，让透明更真实）
   const topBar = document.querySelector('.top-bar');
   if (topBar) {
     const topOp = state.settings.topBarOpacity !== undefined ? state.settings.topBarOpacity : 100;
+    // 如果透明度是 0，背景全透明，剩下毛玻璃
     topBar.style.background = `rgba(255, 255, 255, ${topOp / 100})`;
-    topBar.style.backdropFilter = 'blur(20px)'; // 👈 强制加上高斯模糊
+    topBar.style.backdropFilter = 'blur(20px)'; // 👈 核心：毛玻璃
     topBar.style.webkitBackdropFilter = 'blur(20px)';
   }
   
@@ -3481,7 +3486,7 @@ function applyBeautifySettings() {
   if (bottomBar) {
     const botOp = state.settings.bottomBarOpacity !== undefined ? state.settings.bottomBarOpacity : 100;
     bottomBar.style.background = `rgba(255, 255, 255, ${botOp / 100})`;
-    bottomBar.style.backdropFilter = 'blur(20px)'; // 👈 强制加上高斯模糊
+    bottomBar.style.backdropFilter = 'blur(20px)'; // 👈 核心：毛玻璃
     bottomBar.style.webkitBackdropFilter = 'blur(20px)';
   }
 
