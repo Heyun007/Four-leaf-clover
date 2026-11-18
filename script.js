@@ -375,6 +375,8 @@ function openChat(id) {
 
 window._chatRenderLimit = 50; // 全局变量，控制渲染条数
 
+window._chatRenderLimit = 50;
+
 function renderChatMessages() {
   const container = document.getElementById('chatMessageContainer');
   const msgs = state.chatSessions[state.currentChatId] || [];
@@ -384,12 +386,10 @@ function renderChatMessages() {
     return;
   }
 
-  // 👇 核心防卡顿：只截取最近 N 条进行渲染
   const limit = window._chatRenderLimit || 50;
   const startIndex = Math.max(0, msgs.length - limit);
   const msgsToRender = msgs.slice(startIndex);
 
-  // 记录渲染前的状态，判断你当前是不是在底部
   const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
   const oldScrollHeight = container.scrollHeight;
   const oldScrollTop = container.scrollTop;
@@ -414,7 +414,7 @@ function renderChatMessages() {
   }
 
   container.innerHTML = msgsToRender.map((m, i) => {
-    const realIndex = startIndex + i; // 真实消息索引，用于长按撤回等功能
+    const realIndex = startIndex + i; 
 
     if (m.from === 'system') return `<div data-msg-index="${realIndex}" style="text-align:center; margin:12px 0; font-size:12px; color:${subColor};">${m.text}</div>`;
     
@@ -493,16 +493,13 @@ function renderChatMessages() {
       </div>`;
     }
 
-        // 👇 定义进阶提示小字
     let addedToCardHtml = '';
     if (isUser && m.addedToCard) {
-      const dreamName = state.dreams.find(d => d.id === state.currentChatId)?.name || '梦角';
       addedToCardHtml = `<div style="margin-top: 4px; font-size: 10px; color: ${subColor}; font-style: italic;">此句已被 ${dreamName} 添加至字卡库</div>`;
     }
 
     let advancedQuoteHtml = '';
     if (m.quoteAdvanced) {
-      const dreamName = state.dreams.find(d => d.id === state.currentChatId)?.name || '梦角';
       advancedQuoteHtml = `<div style="margin-bottom: 4px; font-size: 10px; color: ${subColor}; font-style: italic;">${dreamName} 引用了你以前说的一句话</div>`;
     }
     
@@ -545,16 +542,13 @@ function renderChatMessages() {
         </div>`;
       }
 
-            if (m.reaction) {
+      if (m.reaction) {
         emotionHtml += `<div style="margin-top:4px; font-size:10px; color:rgba(0,0,0,0.4); font-style:italic;">
           ${m.reaction.by} ${m.reaction.type === 'like' ? '赞' : '踩'}了此消息
         </div>`;
       }
 
-      // 👈 直接使用上面的 advancedQuoteHtml 拼接，不要在这里重新定义！
-      // 👇 核心：在这里把文本过一遍日系滤镜
-      let filteredText = japaneseFilter(m.text);
-      bubbleContent = `${advancedQuoteHtml}<div class="${textClass}">${filteredText}</div>${emotionHtml}`;
+      bubbleContent = `${advancedQuoteHtml}<div class="${textClass}">${m.text}</div>${emotionHtml}`;
     }
 
     const sideClass = isUser ? 'bubble-user' : 'bubble-dream';
@@ -605,23 +599,18 @@ function renderChatMessages() {
     `;
   }).join('');
   
-  // 👇 修复滚动问题：
-  // 如果是刚进聊天，或者有新消息，自动滚到底部（并多次延迟，防止图片加载撑高导致没滚到底）
   if (isAtBottom || limit === 50) {
     container.scrollTop = container.scrollHeight;
     setTimeout(() => { if(container) container.scrollTop = container.scrollHeight; }, 50);
     setTimeout(() => { if(container) container.scrollTop = container.scrollHeight; }, 200);
   } else {
-    // 如果是往上拉加载历史，保持原来的视角位置
     container.scrollTop = oldScrollTop + (container.scrollHeight - oldScrollHeight);
   }
 
-  // 👇 绑定往上滚动加载更多
   container.onscroll = null;
   container.onscroll = function() {
-    // 如果滚动到了最顶部，且还有历史消息没渲染
     if (container.scrollTop < 10 && msgs.length > limit) {
-      window._chatRenderLimit += 50; // 每次多渲染 50 条
+      window._chatRenderLimit += 50;
       renderChatMessages();
     }
   };
@@ -1522,7 +1511,6 @@ function generateAndSendMessage(chatId, isFirst) {
   const msgs = state.chatSessions[chatId] || [];
   const userMsgs = msgs.filter(m => m.from === 'user').slice(-5);
 
-    // 👇 获取所有被屏蔽的分类
   const usableCards = getUsableCards(chatId);
 
   let allStickers = [];
@@ -1583,11 +1571,9 @@ function generateAndSendMessage(chatId, isFirst) {
     newMsg.stickerData = allStickers[Math.floor(Math.random() * allStickers.length)];
     
   } else {
-    // 纯文字聊天
     newMsg.type = 'text';
     let rawText = '';
 
-    // 1. 提取字卡
     if (canSendCard && s.cardJoinEnabled) {
       const minN = Math.max(1, Math.min(7, s.cardJoinMin || 1));
       const maxN = Math.max(minN, Math.min(7, s.cardJoinMax || 3));
@@ -1599,9 +1585,8 @@ function generateAndSendMessage(chatId, isFirst) {
       rawText = canSendCard ? usableCards[Math.floor(Math.random() * usableCards.length)].text : '……';
     }
 
-    // 2. 高级打碎重组（受自由分段重组开关控制，30%概率触发）
     if (s.cutEnabled !== false && rawText.length > 2 && Math.random() < 0.3) {
-      let pureChars = Array.from(rawText.replace(/[，,]/g, '')); // 先去掉逗号
+      let pureChars = Array.from(rawText.replace(/[，,]/g, '')); 
       let fragments = [];
       let targetParts = Math.floor(Math.random() * 3) + 2; 
       let cutPoints = [];
@@ -1627,7 +1612,6 @@ function generateAndSendMessage(chatId, isFirst) {
       rawText = fragments.slice(0, takeCount).join('');
     }
 
-    // 3. 自由添加符号（75%概率触发）
     if (s.punctEnabled !== false && Math.random() < 0.75 && rawText.length > 1) {
       let puncts = ['，', '。', '！', '？', '…', '~', ' '];
       let resChars = Array.from(rawText);
@@ -1644,7 +1628,6 @@ function generateAndSendMessage(chatId, isFirst) {
 
     newMsg.text = rawText;
 
-    // 👇 4. 自由断句（只说半句话带渐变，受新开关控制）
     if (s.trueCutEnabled !== false && newMsg.text.length > 1 && Math.random() < 0.5) {
       const chars = Array.from(newMsg.text);
       if (chars.length > 1) {
@@ -1659,7 +1642,6 @@ function generateAndSendMessage(chatId, isFirst) {
       }
     }
 
-    // 情绪标签 + 交流意图
     if (s.emotionEnabled !== false) {
       const emotions = ['开心', '激动', '伤心', '平静', '害羞', '期待', '疲惫', '温柔', '傲娇', '疑惑', '无奈'];
       newMsg.emotion = emotions[Math.floor(Math.random() * emotions.length)];
@@ -1670,19 +1652,15 @@ function generateAndSendMessage(chatId, isFirst) {
     }
   }
 
-    // 引用与复读逻辑
   if (isFirst && userMsgs.length > 0) {
     let isAdvancedQuoteTriggered = false;
 
-    // 1. 👇 新增：进阶引用（直接复读/截取用户的话，15%概率）
-        if (s.advancedQuoteEnabled !== false && Math.random() < 0.15) {
-      // 找最近的一条用户纯文字消息
+    if (s.advancedQuoteEnabled !== false && Math.random() < 0.15) {
       const recentTexts = userMsgs.filter(m => m.type === 'text' && m.text.trim().length > 1);
       if (recentTexts.length > 0) {
         const pickedMsg = recentTexts[Math.floor(Math.random() * recentTexts.length)];
         let rawStr = pickedMsg.text.trim();
         
-        // 进阶版截取逻辑
         let resultStr = rawStr;
         if (rawStr.length > 3 && Math.random() < 0.6) {
           let chars = Array.from(rawStr);
@@ -1693,9 +1671,8 @@ function generateAndSendMessage(chatId, isFirst) {
 
         newMsg.type = 'text';
         newMsg.text = resultStr;
-        newMsg.quoteAdvanced = true; // 标记为进阶引用
+        newMsg.quoteAdvanced = true; 
         
-        // 因为是文字，顺便把情绪和意图重新随机一下（不然复读出来没有标签了）
         if (s.emotionEnabled !== false) {
           const emotions = ['开心', '激动', '伤心', '平静', '害羞', '期待', '疲惫', '温柔', '傲娇', '疑惑', '无奈'];
           newMsg.emotion = emotions[Math.floor(Math.random() * emotions.length)];
@@ -1709,8 +1686,6 @@ function generateAndSendMessage(chatId, isFirst) {
       }
     } 
 
-    // 2. 👇 原版引用：带引用条的（受开关控制，15%概率）
-    // 只有当进阶引用没触发时，才判断原版引用
     if (!isAdvancedQuoteTriggered && s.dreamQuoteEnabled !== false && Math.random() < 0.15) {
       const picked = userMsgs[Math.floor(Math.random() * userMsgs.length)];
       newMsg.quote = { text: picked.type === 'text' ? picked.text : '[图片/表情]', senderName: state.profile.name || '我', msgId: -1, type: picked.type };
@@ -1726,7 +1701,6 @@ function generateAndSendMessage(chatId, isFirst) {
     renderChatMessages();
   }
 
-  // 👇 赞/踩功能（延迟 1.5 秒）
   setTimeout(() => {
     const msgsList = state.chatSessions[chatId];
     if (!msgsList) return;
@@ -1734,7 +1708,6 @@ function generateAndSendMessage(chatId, isFirst) {
     const dreamObj = state.dreams.find(d => d.id === chatId);
     const dreamName = dreamObj ? dreamObj.name : '梦角';
 
-    // 1. 赞/踩用户发的消息 (85%概率)
     if (Math.random() < 0.85) {
       const userMsgs = msgsList.filter(m => m.from === 'user' && !m.reaction && (m.type === 'text' || m.type === 'sticker' || m.type === 'image'));
       if (userMsgs.length > 0) {
@@ -1750,7 +1723,6 @@ function generateAndSendMessage(chatId, isFirst) {
       }
     }
 
-    // 2. 赞/踩他自己发的消息 (35%概率)
     if (Math.random() < 0.35) {
       const dreamMsgs = msgsList.filter(m => m.from === 'dream' && !m.reaction && (m.type === 'text' || m.type === 'sticker'));
       if (dreamMsgs.length > 0) {
@@ -1767,15 +1739,13 @@ function generateAndSendMessage(chatId, isFirst) {
     }
   }, 1500);
 
-  // 👇 新增：梦角主动撤回消息（10% 概率）
-  if (Math.random() < 0.05) {
+  if (Math.random() < 0.1) {
     setTimeout(() => {
       const msgsList = state.chatSessions[chatId];
       if (!msgsList) return;
       const dreamObj = state.dreams.find(d => d.id === chatId);
       const dreamName = dreamObj ? dreamObj.name : '梦角';
 
-      // 从后往前找，找一条最近发的、没撤回的梦角消息（只撤回文本或表情，不撤卡片）
       for (let i = msgsList.length - 1; i >= 0; i--) {
         const m = msgsList[i];
         if (m.from === 'dream' && !m.recalled && (m.type === 'text' || m.type === 'sticker')) {
@@ -1793,12 +1763,11 @@ function generateAndSendMessage(chatId, isFirst) {
           break; 
         }
       }
-    }, 3000 + Math.random() * 5000); // 发出来 3~8 秒后撤回
+    }, 3000 + Math.random() * 5000);
   }
 
-    // 👇 梦角回复时，无条件弹通知
-    if (s.pushEnabled && Notification.permission === 'granted') {
-    pushNotification(state.dreams.find(d=>d.id===chatId)?.name || '梦角', newMsg.type === 'text' ? newMsg.text : '[消息]', state.dreams.find(d=>d.id===chatId)?.avatar);
+  if (s.pushEnabled && Notification.permission === 'granted') {
+    pushNotification(state.dreams.find(d=>d.id===chatId)?.name || '梦角', newMsg.type === 'text' ? newMsg.text : '[消息]');
   }
 }
 
