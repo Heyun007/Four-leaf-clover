@@ -5420,14 +5420,28 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
-// ================= 日系电波文字转换器 =================
+// ================= 终极全量日系电波滤镜 =================
+let openccConverter = null;
+// 初始化转换器（简转繁）
+if (typeof OpenCC !== 'undefined') {
+  openccConverter = OpenCC.Converter({ from: 'cn', to: 'tw' });
+}
+
 function japaneseFilter(text) {
   if (!text || typeof text !== 'string') return text;
-  // 把特定的字替换成日文假名，并做一些简单的标点替换增加日系感
-  return text
+
+  let result = text;
+
+  // 1. 如果转换器加载成功，把所有的简体汉字全量变成繁体
+  if (openccConverter) {
+    result = openccConverter(result);
+  }
+
+  // 2. 替换特定字为日文假名（放在繁体转换之后）
+  result = result
     .replace(/我/g, 'う')
     .replace(/的/g, 'ン')
-    .replace(/一/g, 'へ')
-    .replace(/是/g, '昰') // 顺带替换一个繁体字增加感觉
-    .replace(/这/g, '這');
+    .replace(/一/g, 'へ');
+
+  return result;
 }
