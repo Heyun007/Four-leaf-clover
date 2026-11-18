@@ -3880,6 +3880,7 @@ function checkAutoMessage() {
   if (!isViewingThisChat) {
     try { sendNotification(picked.name, text); } catch(e){}
     
+    // 底层系统推送
     if (state.settings && state.settings.pushEnabled && "Notification" in window && Notification.permission === "granted") {
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.ready.then(function(registration) {
@@ -5367,25 +5368,34 @@ function checkAvatarAndNickname() {
 setInterval(checkAvatarAndNickname, 60 * 1000);
 setTimeout(checkAvatarAndNickname, 5000);
 
-// ================= 最简单的静音音频保活 =================
-setTimeout(() => {
-  const silentAudio = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA");
-  silentAudio.loop = true;
-  silentAudio.volume = 0.001; // 声音极小，听不见，但系统会认为你在听歌
+// ================= 真·无感音频后台保活 =================
+window._keepAliveAudio = null;
+
+function startKeepAlive() {
+  if (window._keepAliveAudio) return;
   
-  // 尝试播放
-  silentAudio.play().then(() => console.log("✅ 保活成功")).catch(e => {
-    console.log("⚠️ 需要你点一下屏幕才能启动保活");
-    // 如果你点屏幕，立刻强行启动
-    document.body.addEventListener('click', () => {
-      silentAudio.play().then(() => console.log("✅ 点击后保活成功"));
+  // 一段极短的 Base64 静音音频
+  const silentAudio = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
+  
+  window._keepAliveAudio = new Audio(silentAudio);
+  window._keepAliveAudio.loop = true;
+  // 绝对不能设为0，设为0系统会认为是静音掐断。设为0.01极其微小，你听不见，但系统认定你在活跃！
+  window._keepAliveAudio.volume = 0.01; 
+
+  window._keepAliveAudio.play().then(() => {
+    console.log("✅ 音频保活已启动，系统不敢冻结了");
+  }).catch(e => {
+    console.log("⚠️ 保活被浏览器拦截，需要你点一下屏幕");
+    document.addEventListener('click', function() {
+      window._keepAliveAudio.play().then(() => console.log("✅ 点击后保活成功"));
     }, { once: true });
   });
-}, 1000);
+}
 
-loadState(); // 👈 你的原本代码在这，不要动它
+// 启动时尝试一次
+setTimeout(startKeepAlive, 1000);
 
-loadState();
+loadState(); // 👈 不要动你原本的这行代码
 
 // ================= 密码锁逻辑 =================
 function checkLockPassword() {
