@@ -3683,25 +3683,30 @@ function togglePush() {
   // 如果当前是关闭状态，点击则尝试开启
   if (!state.settings.pushEnabled) {
     if (!("Notification" in window)) {
-      return alert('❌ 您的浏览器不支持网页通知！请换用 Chrome 或 Edge。');
+      return alert('❌ 您的浏览器不支持网页通知！');
     }
     
-    // 强行向浏览器申请权限！
+    // 强行向浏览器申请权限（关键！）
     Notification.requestPermission().then(perm => {
       if (perm === 'granted') {
         state.settings.pushEnabled = true;
         document.getElementById('pushToggle').classList.add('on');
         saveState();
         
-        // 强制唤醒一次 Service Worker，测试是否接通
+        // 强行唤醒 Service Worker 并发送测试通知
         if ('serviceWorker' in navigator) {
           navigator.serviceWorker.ready.then(function(reg) {
             reg.showNotification("✅ 推送已开启", {
-              body: "以后就算关掉网页，梦角也能给你发消息啦！",
-              icon: "./icon.png",
+              body: "如果你在通知栏看到了这条消息，说明通道彻底打通了！",
+              icon: "./icon.png", // 使用你网站根目录的图标
+              badge: "./icon.png",
               vibrate: [200, 100, 200]
             });
+          }).catch(err => {
+            alert("Service Worker 还没准备好，请刷新页面后再试。");
           });
+        } else {
+          alert("❌ 你的浏览器不支持后台通知，请使用 Edge 或 Chrome。");
         }
       } else {
         alert('❌ 授权失败！\n\n如果你之前点过“拒绝”，请点击浏览器地址栏的【锁头图标】，把“通知”手动改成“允许”，然后再试一次。');
