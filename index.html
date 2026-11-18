@@ -1067,6 +1067,16 @@
     </div>
 
   <script src="script.js"></script>
+
+    <script>
+    // 注册后台服务，这是手机能弹通知的钥匙！
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => console.log('✅ Service Worker 注册成功，通知准备就绪！'))
+        .catch(err => console.log('❌ Service Worker 注册失败:', err));
+    }
+  </script>
+  
 </body>
 
     <!-- 👇 密码锁界面（暗黑磨砂风） -->
