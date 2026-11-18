@@ -1,6 +1,5 @@
 /* ================= 基础设置 ================= */
-* { margin: 0; padding: 0; box-sizing: border-box; font-family: inherit; -webkit-tap-highlight-color: transparent; }
-html, body { font-family: sans-serif !important; }
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 :root { --bg:#f5f5f7; --card:#ffffff; --text:#1d1d1f; --gray:#86868b; --border:#e5e5ea; --blue:#007aff; --red:#ff3b30; --green:#34c759; }
 body { background: #e5e5ea; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
 
@@ -73,7 +72,6 @@ body { background: #e5e5ea; display: flex; justify-content: center; align-items:
 /* ================= 聊天气泡 ================= */
 .chat-bubble {
   /* 这里留空，或者只保留字体设置，宽度完全由 JS 里的内联样式和内容决定 */
-  font-family: inherit;
 }
 
 /* ================= 字卡列表 ================= */
@@ -227,7 +225,6 @@ body { background: #e5e5ea; display: flex; justify-content: center; align-items:
   font-size: 14px;
   color: #333;
   cursor: pointer;
-  font-family: inherit;
   transition: background 0.15s;
   white-space: nowrap;
   font-weight: 500;
@@ -339,7 +336,6 @@ input[type="range"]::-webkit-slider-thumb {
   cursor: pointer;
   transition: all 0.2s ease;
   box-shadow: 0 2px 6px rgba(0,0,0,0.03);
-  font-family: inherit;
 }
 
 /* 按钮按下去的反馈 */
