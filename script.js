@@ -3417,7 +3417,6 @@ function applyBeautifySettings() {
   fontStyle.innerHTML = `
     body, .chat-bubble, input, textarea, .page-header h2, .avatar-name, #chatMessageContainer span, #chatMessageContainer div { 
       font-size: ${size}px !important; 
-      font-family: inherit !important; /* 👈 核心补丁：强制继承，绝不使用默认字体 */
     }
   `;
 
