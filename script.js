@@ -1810,11 +1810,9 @@ function generateAndSendMessage(chatId, isFirst) {
     }, 3000 + Math.random() * 5000); // 发出来 3~8 秒后撤回
   }
 
+    // 👇 梦角回复时，无条件弹通知
   if (s.pushEnabled && Notification.permission === 'granted') {
-    // 👇 如果网页不可见（息屏或切后台），或者当前聊的不是这个梦角，就弹通知
-    if (document.visibilityState === 'hidden' || state.currentChatId !== chatId) {
-      pushNotification(state.dreams.find(d=>d.id===chatId)?.name || '梦角', newMsg.type === 'text' ? newMsg.text : '[消息]');
-    }
+    pushNotification(state.dreams.find(d=>d.id===chatId)?.name || '梦角', newMsg.type === 'text' ? newMsg.text : '[消息]');
   }
 }
 
@@ -3879,9 +3877,9 @@ function checkAutoMessage() {
     // 👇 核心修复：必须网页在前台（没息屏、没切后台）且在这个梦角的聊天页，才不弹通知
   var isViewingThisChat = (document.visibilityState === 'visible' && document.getElementById('pageChat').classList.contains('active') && state.currentChatId === picked.id);
   
-    if (!isViewingThisChat) {
-    try { sendNotification(picked.name, text); } catch(e){}
-    // 👇 换成调用统一的 pushNotification
+      // 👇 删掉了所有限制，只要发消息就弹通知
+  try { sendNotification(picked.name, text); } catch(e){}
+  if (state.settings && state.settings.pushEnabled && "Notification" in window && Notification.permission === "granted") {
     pushNotification(picked.name, text, picked.avatar);
   }
 }
