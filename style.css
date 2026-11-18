@@ -1,4 +1,5 @@
 /* ================= 基础设置 ================= */
+* { font-family: "Hiragino Sans GB", "PingFang SC", "Microsoft YaHei", "Noto Sans JP", sans-serif !important; }
 /* 强行请求系统默认无衬线字体 */
 body, div, span, p, h1, h2, h3, h4, h5, h6, input, textarea, button {
     font-family: sans-serif !important;
