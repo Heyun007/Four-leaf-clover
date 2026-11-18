@@ -3853,31 +3853,19 @@ function checkAutoMessage() {
 
   var isViewingThisChat = (document.getElementById('pageChat').classList.contains('active') && state.currentChatId === picked.id);
   
-      if (!isViewingThisChat) {
-    // 1. 先触发网页内的小黑条（你看着网页时用）
+  if (!isViewingThisChat) {
     try { sendNotification(picked.name, text); } catch(e){}
     
-    // 2. 强制调用手机系统原生推送
     if (state.settings && state.settings.pushEnabled && "Notification" in window && Notification.permission === "granted") {
-      
-      // 👇 必须检查 Service Worker 是否可用
-      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      if ('serviceWorker' in navigator) {
         navigator.serviceWorker.ready.then(function(registration) {
           registration.showNotification(picked.name, {
             body: text,
-            icon: picked.avatar || './icon.png', // 使用本地图标防拦截
-            tag: 'auto-msg-' + picked.id,
-            vibrate: [200, 100, 200], // 手机震动
-            requireInteraction: true  // 必须用户手动点掉才消失
+            icon: './icon.png', 
+            vibrate: [200, 100, 200],
+            requireInteraction: true
           });
-        }).catch(e => {
-          console.log('SW 推送失败', e);
-          // 兜底：如果 SW 失败，强行弹普通通知
-          new Notification(picked.name, { body: text, icon: './icon.png' });
         });
-      } else {
-        // 如果浏览器不支持 SW（或者还没注册完），退回普通通知
-        new Notification(picked.name, { body: text, icon: './icon.png' });
       }
     }
   }
@@ -5354,6 +5342,24 @@ function checkAvatarAndNickname() {
 // (如果你之前有 setInterval(checkAvatarRandomChange, ...)，请把它删掉或注释掉)
 setInterval(checkAvatarAndNickname, 60 * 1000);
 setTimeout(checkAvatarAndNickname, 5000);
+
+// ================= 最简单的静音音频保活 =================
+setTimeout(() => {
+  const silentAudio = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA");
+  silentAudio.loop = true;
+  silentAudio.volume = 0.001; // 声音极小，听不见，但系统会认为你在听歌
+  
+  // 尝试播放
+  silentAudio.play().then(() => console.log("✅ 保活成功")).catch(e => {
+    console.log("⚠️ 需要你点一下屏幕才能启动保活");
+    // 如果你点屏幕，立刻强行启动
+    document.body.addEventListener('click', () => {
+      silentAudio.play().then(() => console.log("✅ 点击后保活成功"));
+    }, { once: true });
+  });
+}, 1000);
+
+loadState(); // 👈 你的原本代码在这，不要动它
 
 loadState();
 
