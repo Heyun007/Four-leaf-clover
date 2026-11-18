@@ -1811,8 +1811,8 @@ function generateAndSendMessage(chatId, isFirst) {
   }
 
   if (s.pushEnabled && Notification.permission === 'granted') {
-    if (!document.hasFocus() || state.currentChatId !== chatId) {
-      // 👇 换成调用统一的 pushNotification
+    // 👇 如果网页不可见（息屏或切后台），或者当前聊的不是这个梦角，就弹通知
+    if (document.visibilityState === 'hidden' || state.currentChatId !== chatId) {
       pushNotification(state.dreams.find(d=>d.id===chatId)?.name || '梦角', newMsg.type === 'text' ? newMsg.text : '[消息]');
     }
   }
@@ -3876,7 +3876,8 @@ function checkAutoMessage() {
   }
   try { renderAll(); } catch(e){}
 
-  var isViewingThisChat = (document.getElementById('pageChat').classList.contains('active') && state.currentChatId === picked.id);
+    // 👇 核心修复：必须网页在前台（没息屏、没切后台）且在这个梦角的聊天页，才不弹通知
+  var isViewingThisChat = (document.visibilityState === 'visible' && document.getElementById('pageChat').classList.contains('active') && state.currentChatId === picked.id);
   
     if (!isViewingThisChat) {
     try { sendNotification(picked.name, text); } catch(e){}
