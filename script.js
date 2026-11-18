@@ -5420,24 +5420,38 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
-// ================= 终极全量日系电波滤镜 =================
+// ================= 终极全量简繁+假名转换器（动态加载版） =================
 let openccConverter = null;
-// 初始化转换器（简转繁）
-if (typeof OpenCC !== 'undefined') {
-  openccConverter = OpenCC.Converter({ from: 'cn', to: 'tw' });
-}
+
+// 动态创建一个 script 标签，去请求国内极速 CDN 上的全量字典
+(function loadOpenCC() {
+  const script = document.createElement('script');
+  // 使用国内 BootCDN，速度极快，几乎不会被浏览器拦截
+  script.src = 'https://cdn.bootcdn.net/ajax/libs/opencc-js/1.0.5/umd/full.min.js';
+  script.onload = function() {
+    if (typeof OpenCC !== 'undefined') {
+      // 初始化：简转繁（台湾正体）
+      openccConverter = OpenCC.Converter({ from: 'cn', to: 'tw' });
+      console.log('✅ 全量简繁字典加载成功，已达到完美转换状态！');
+    }
+  };
+  script.onerror = function() {
+    console.log('❌ 字典加载失败，将使用原字体。');
+  };
+  document.head.appendChild(script);
+})();
 
 function japaneseFilter(text) {
   if (!text || typeof text !== 'string') return text;
 
   let result = text;
 
-  // 1. 如果转换器加载成功，把所有的简体汉字全量变成繁体
+  // 1. 如果全量转换器加载好了，把所有简体完美转成繁体
   if (openccConverter) {
     result = openccConverter(result);
   }
 
-  // 2. 替换特定字为日文假名（放在繁体转换之后）
+  // 2. 替换特定字为日文假名
   result = result
     .replace(/我/g, 'う')
     .replace(/的/g, 'ン')
