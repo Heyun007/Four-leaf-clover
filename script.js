@@ -552,7 +552,9 @@ function renderChatMessages() {
       }
 
       // 👈 直接使用上面的 advancedQuoteHtml 拼接，不要在这里重新定义！
-      bubbleContent = `${advancedQuoteHtml}<div class="${textClass}">${m.text}</div>${emotionHtml}`;
+      // 👇 核心：在这里把文本过一遍日系滤镜
+      let filteredText = japaneseFilter(m.text);
+      bubbleContent = `${advancedQuoteHtml}<div class="${textClass}">${filteredText}</div>${emotionHtml}`;
     }
 
     const sideClass = isUser ? 'bubble-user' : 'bubble-dream';
@@ -625,6 +627,15 @@ function renderChatMessages() {
   };
 
   attachLongPress();
+}
+
+// 监听输入框，实时替换显示的假名（但保存的仍然是原字）
+const chatInputEl = document.getElementById('chatInput');
+if (chatInputEl) {
+  chatInputEl.addEventListener('input', function(e) {
+    // 如果你需要输入框也实时显示假名，可以取消下面这行的注释，但这会影响你打字，建议不用
+    // this.value = japaneseFilter(this.value); 
+  });
 }
 
 function sendChatMsg() {
@@ -5408,3 +5419,15 @@ document.addEventListener("visibilitychange", () => {
     }, 1000);
   }
 });
+
+// ================= 日系电波文字转换器 =================
+function japaneseFilter(text) {
+  if (!text || typeof text !== 'string') return text;
+  // 把特定的字替换成日文假名，并做一些简单的标点替换增加日系感
+  return text
+    .replace(/我/g, 'う')
+    .replace(/的/g, 'ン')
+    .replace(/一/g, 'へ')
+    .replace(/是/g, '昰') // 顺带替换一个繁体字增加感觉
+    .replace(/这/g, '這');
+}
