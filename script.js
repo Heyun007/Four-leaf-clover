@@ -618,15 +618,6 @@ function renderChatMessages() {
   attachLongPress();
 }
 
-// 监听输入框，实时替换显示的假名（但保存的仍然是原字）
-const chatInputEl = document.getElementById('chatInput');
-if (chatInputEl) {
-  chatInputEl.addEventListener('input', function(e) {
-    // 如果你需要输入框也实时显示假名，可以取消下面这行的注释，但这会影响你打字，建议不用
-    // this.value = japaneseFilter(this.value); 
-  });
-}
-
 function sendChatMsg() {
   const input = document.getElementById('chatInput');
   const text = input.value.trim();
@@ -645,7 +636,6 @@ function sendChatMsg() {
 
   state.chatSessions[state.currentChatId].push(newMsg);
   
-  // 👇 加上这一句！每次你发消息，就把这个梦角的计时器清零，重新开始算 20 分钟！
   if (!state.lastActivityAt) state.lastActivityAt = {};
   state.lastActivityAt[state.currentChatId] = Date.now();
 
