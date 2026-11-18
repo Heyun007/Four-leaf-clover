@@ -1,4 +1,8 @@
 /* ================= 基础设置 ================= */
+/* 强行请求系统默认无衬线字体 */
+body, div, span, p, h1, h2, h3, h4, h5, h6, input, textarea, button {
+    font-family: sans-serif !important;
+}
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 :root { --bg:#f5f5f7; --card:#ffffff; --text:#1d1d1f; --gray:#86868b; --border:#e5e5ea; --blue:#007aff; --red:#ff3b30; --green:#34c759; }
 body { background: #e5e5ea; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
