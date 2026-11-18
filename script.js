@@ -3679,22 +3679,41 @@ function initChatSettingPage() {
 // ================= 推送与备份功能 =================
 function togglePush() {
   if (!state.settings) state.settings = {};
-  state.settings.pushEnabled = !state.settings.pushEnabled;
-  document.getElementById('pushToggle').classList.toggle('on', state.settings.pushEnabled);
-  saveState();
-
-  if (state.settings.pushEnabled) {
-    if (!("Notification" in window)) return showToast('不支持通知');
+  
+  // 如果当前是关闭状态，点击则尝试开启
+  if (!state.settings.pushEnabled) {
+    if (!("Notification" in window)) {
+      return alert('❌ 您的浏览器不支持网页通知！请换用 Chrome 或 Edge。');
+    }
+    
+    // 强行向浏览器申请权限！
     Notification.requestPermission().then(perm => {
-      if (perm === 'granted') showToast('推送已开启');
-      else {
-        state.settings.pushEnabled = false;
-        document.getElementById('pushToggle').classList.remove('on');
+      if (perm === 'granted') {
+        state.settings.pushEnabled = true;
+        document.getElementById('pushToggle').classList.add('on');
         saveState();
+        
+        // 强制唤醒一次 Service Worker，测试是否接通
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.ready.then(function(reg) {
+            reg.showNotification("✅ 推送已开启", {
+              body: "以后就算关掉网页，梦角也能给你发消息啦！",
+              icon: "./icon.png",
+              vibrate: [200, 100, 200]
+            });
+          });
+        }
+      } else {
+        alert('❌ 授权失败！\n\n如果你之前点过“拒绝”，请点击浏览器地址栏的【锁头图标】，把“通知”手动改成“允许”，然后再试一次。');
       }
     });
-  } else {
-    showToast('推送已关闭');
+  } 
+  // 如果当前是开启状态，点击则关闭
+  else {
+    state.settings.pushEnabled = false;
+    document.getElementById('pushToggle').classList.remove('on');
+    saveState();
+    alert('已关闭后台推送');
   }
 }
 
