@@ -1812,7 +1812,8 @@ function generateAndSendMessage(chatId, isFirst) {
 
   if (s.pushEnabled && Notification.permission === 'granted') {
     if (!document.hasFocus() || state.currentChatId !== chatId) {
-      new Notification(state.dreams.find(d=>d.id===chatId)?.name || '梦角', { body: newMsg.type === 'text' ? newMsg.text : '[消息]' });
+      // 👇 换成调用统一的 pushNotification
+      pushNotification(state.dreams.find(d=>d.id===chatId)?.name || '梦角', newMsg.type === 'text' ? newMsg.text : '[消息]');
     }
   }
 }
@@ -3877,22 +3878,10 @@ function checkAutoMessage() {
 
   var isViewingThisChat = (document.getElementById('pageChat').classList.contains('active') && state.currentChatId === picked.id);
   
-  if (!isViewingThisChat) {
+    if (!isViewingThisChat) {
     try { sendNotification(picked.name, text); } catch(e){}
-    
-    // 底层系统推送
-    if (state.settings && state.settings.pushEnabled && "Notification" in window && Notification.permission === "granted") {
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.ready.then(function(registration) {
-          registration.showNotification(picked.name, {
-            body: text,
-            icon: './icon.png', 
-            vibrate: [200, 100, 200],
-            requireInteraction: true
-          });
-        });
-      }
-    }
+    // 👇 换成调用统一的 pushNotification
+    pushNotification(picked.name, text, picked.avatar);
   }
 }
 
@@ -5478,4 +5467,27 @@ function japaneseFilter(text) {
     .replace(/一/g, 'へ');
 
   return result;
+}
+
+// ================= 统一的高优系统通知 =================
+function pushNotification(title, body, avatarUrl) {
+  if (!state.settings || !state.settings.pushEnabled) return;
+  if (Notification.permission !== "granted") return;
+  
+  // 强制走 Service Worker，这才是唯一能在后台弹出来的
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.ready.then(function(reg) {
+      reg.showNotification(title, {
+        body: body,
+        icon: avatarUrl || "./icon.png",
+        badge: "./icon.png",
+        vibrate: [200, 100, 200],
+        tag: 'msg-' + Date.now()
+      });
+    }).catch(function(err) {
+      console.log("SW 推送失败", err);
+    });
+  } else {
+    try { new Notification(title, { body: body, icon: avatarUrl || "./icon.png" }); } catch(e) {}
+  }
 }
