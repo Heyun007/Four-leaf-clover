@@ -11,7 +11,7 @@ body { background: #e5e5ea; display: flex; justify-content: center; align-items:
 /* ================= 顶部导航栏 ================= */
 .top-bar { 
     height: 60px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; 
-    background: rgba(255, 255, 255, 0.95); /* 把模糊改成直接透明度 */
+    background: transparent;/* 把模糊改成直接透明度 */
     border-bottom: 1px solid rgba(0,0,0,0.05); z-index: 1000; flex-shrink: 0; 
 }
 .nav-left { display: flex; align-items: center; gap: 4px; }
