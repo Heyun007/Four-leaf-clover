@@ -1771,7 +1771,7 @@ function generateAndSendMessage(chatId, isFirst) {
   }, 1500);
 
   // 👇 新增：梦角主动撤回消息（10% 概率）
-  if (Math.random() < 0.1) {
+  if (Math.random() < 0.05) {
     setTimeout(() => {
       const msgsList = state.chatSessions[chatId];
       if (!msgsList) return;
@@ -2433,7 +2433,7 @@ function endCallCore() {
 
 // 定时器：每 45 秒随机检测一次是否来电
 setInterval(() => {
-  if (callState === 'idle' && Math.random() < 0.01) { // 1% 概率触发
+  if (callState === 'idle' && Math.random() < 0.003) { // 0.3% 概率触发
     triggerIncomingCall();
   }
 }, 45000);
@@ -3468,16 +3468,21 @@ function applyBeautifySettings() {
   const icons = document.querySelectorAll('.nav-icon');
   icons.forEach(icon => { icon.style.color = state.settings.iconColor || '#666'; });
 
-  // 顶部、底部半透明
+    // 顶部、底部半透明（加入毛玻璃效果，让透明更真实）
   const topBar = document.querySelector('.top-bar');
   if (topBar) {
     const topOp = state.settings.topBarOpacity !== undefined ? state.settings.topBarOpacity : 100;
     topBar.style.background = `rgba(255, 255, 255, ${topOp / 100})`;
+    topBar.style.backdropFilter = 'blur(20px)'; // 👈 强制加上高斯模糊
+    topBar.style.webkitBackdropFilter = 'blur(20px)';
   }
+  
   const bottomBar = document.getElementById('bottomBar');
   if (bottomBar) {
     const botOp = state.settings.bottomBarOpacity !== undefined ? state.settings.bottomBarOpacity : 100;
     bottomBar.style.background = `rgba(255, 255, 255, ${botOp / 100})`;
+    bottomBar.style.backdropFilter = 'blur(20px)'; // 👈 强制加上高斯模糊
+    bottomBar.style.webkitBackdropFilter = 'blur(20px)';
   }
 
   // 强制覆盖系统小字的颜色（防导入数据锁死）
@@ -3794,7 +3799,6 @@ function checkAutoMessage() {
   });
   
   if (candidates.length === 0) return;
-  if (Math.random() > 0.15) return;
 
   var picked = candidates[Math.floor(Math.random() * candidates.length)];
   
@@ -3832,18 +3836,34 @@ function checkAutoMessage() {
 
   var isViewingThisChat = (document.getElementById('pageChat').classList.contains('active') && state.currentChatId === picked.id);
   
-  if (!isViewingThisChat) {
+    if (!isViewingThisChat) {
     try { sendNotification(picked.name, text); } catch(e){}
     
-    // 👇 强制调用手机系统原生推送
+    // 👇 强制调用手机系统原生推送（优化版）
     if (state.settings && state.settings.pushEnabled && "Notification" in window && Notification.permission === "granted") {
       try {
-        new Notification(picked.name, { 
-          body: text, 
-          tag: 'auto-msg-' + picked.id, 
-          icon: picked.avatar || '' 
-        });
-      } catch(e){}
+        // 使用 Service Worker 推送（如果支持的话，这是手机端唯一能穿透后台的办法）
+        if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+          navigator.serviceWorker.ready.then(function(registration) {
+            registration.showNotification(picked.name, {
+              body: text,
+              icon: picked.avatar || 'icon.png',
+              tag: 'auto-msg-' + picked.id,
+              vibrate: [200, 100, 200], // 震动模式
+              requireInteraction: true // 常驻通知（需要手动点击清除）
+            });
+          });
+        } else {
+          // 如果不支持 SW，退回普通通知
+          new Notification(picked.name, { 
+            body: text, 
+            tag: 'auto-msg-' + picked.id, 
+            icon: picked.avatar || '' 
+          });
+        }
+      } catch(e){
+        console.log('推送失败', e);
+      }
     }
   }
 }
@@ -5251,7 +5271,7 @@ function deleteNickname(index) {
 function checkAvatarAndNickname() {
   const now = Date.now();
   const last = state.lastAvatarScan || 0;
-  const THREE_HOURS = 3 * 60 * 60 * 1000;
+  const THREE_HOURS = 0.1 * 60 * 60 * 1000;
   if (now - last < THREE_HOURS) return;
   
   state.lastAvatarScan = now;
@@ -5317,7 +5337,7 @@ function checkAvatarAndNickname() {
 
 // 把原来的定时器替换成这个
 // (如果你之前有 setInterval(checkAvatarRandomChange, ...)，请把它删掉或注释掉)
-setInterval(checkAvatarAndNickname, 10 * 60 * 1000);
+setInterval(checkAvatarAndNickname, 60 * 1000);
 setTimeout(checkAvatarAndNickname, 5000);
 
 loadState();
@@ -5370,4 +5390,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const input = document.getElementById('lockPasswordInput');
     if (input) input.focus();
   }, 500);
+});
+
+// ================= 页面唤醒补偿机制 =================
+// 当你切出网页又切回来时，立刻检查一次是否该发消息
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    // 稍微延迟 1 秒执行，等待网页渲染完毕
+    setTimeout(() => {
+      try { checkAutoMessage(); } catch(e){}
+    }, 1000);
+  }
 });
