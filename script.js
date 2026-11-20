@@ -548,7 +548,8 @@ function renderChatMessages() {
         </div>`;
       }
 
-      bubbleContent = `${advancedQuoteHtml}<div class="${textClass}">${m.text}</div>${emotionHtml}`;
+      let filteredText = typeof japaneseFilter === 'function' ? japaneseFilter(m.text) : m.text;
+      bubbleContent = `${advancedQuoteHtml}<div class="${textClass}">${filteredText}</div>${emotionHtml}`;
     }
 
     const sideClass = isUser ? 'bubble-user' : 'bubble-dream';
